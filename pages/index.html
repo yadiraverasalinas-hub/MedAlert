@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es" data-edition="web">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f9fc">
+  <title>MedAlert · Web de farmacia</title>
+  <base href="../">
+  <link rel="stylesheet" href="css/styles.css">
+  <script defer src="design/index.js"></script>
+  <script defer src="js/funciones.js"></script>
+  <script defer src="js/web-app.js"></script>
+  <script defer src="js/main.js"></script>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>MedAlert</strong>
+    <label class="picker">
+      <span>Pantalla</span>
+      <select id="screen" aria-label="Elegir pantalla de MedAlert"></select>
+    </label>
+    <span class="edition">Web de farmacia</span>
+  </header>
+  <main class="stage" aria-label="MedAlert">
+    <svg id="display" xmlns="http://www.w3.org/2000/svg" aria-label="MedAlert">
+      <defs id="geometry"></defs>
+      <g id="layers"></g>
+    </svg>
+    <img id="local-photo" alt="Captura elegida en este dispositivo" hidden>
+    <section id="local-items"></section>
+    <div id="web-app" hidden></div>
+  </main>
+  <aside class="demo">Entorno académico · Datos y alertas de ejemplo</aside>
+  <output id="feedback" aria-live="polite"></output>
+  <dialog id="capture">
+    <h2>Capturar empaque</h2>
+    <p>Elige una foto del empaque o continúa con la muestra de MedAlert.</p>
+    <label>Fotografía del producto <input type="file" accept="image/*" capture="environment"></label>
+    <button data-sample>Usar captura de ejemplo</button>
+    <form method="dialog"><button>Volver a la cámara</button></form>
+  </dialog>
+  <dialog id="details">
+    <h2></h2>
+    <div class="details-body"></div>
+    <form method="dialog"><button>Cerrar</button></form>
+  </dialog>
+  <pre id="print-report"></pre>
+</body>
+</html>
