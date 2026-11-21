@@ -56,6 +56,7 @@ window.MedAlertConsumer = (() => {
   function localNotice(text = 'Demostración local: no se ejecuta OCR ni IA, no se consultan fuentes oficiales y no se envían datos. No ingreses información personal o sensible.') {
     const note = element('p', 'consumer-notice', text);
     note.setAttribute('role', 'note');
+    note.prepend(window.MedAlertWeb.icon('info'));
     return note;
   }
 
@@ -169,7 +170,11 @@ window.MedAlertConsumer = (() => {
     checkbox.addEventListener('change', () => { state.captureConfirmed = checkbox.checked; render(); });
     confirmation.append(checkbox, element('span', '', 'Confirmo visualmente que ambas caras se ven completas y legibles.'));
     app.append(confirmation);
-    if (state.feedback) app.append(element('p', 'consumer-error', state.feedback));
+    if (state.feedback) {
+      const error = element('p', 'consumer-error');
+      error.append(window.MedAlertWeb.icon('warning'), element('span', '', state.feedback));
+      app.append(error);
+    }
     const next = button('Continuar con el ingreso manual', 'button button-primary', () => {
       state.step = 'data';
       state.feedback = '';
@@ -279,9 +284,13 @@ window.MedAlertConsumer = (() => {
     const app = shell('Resumen de la revisión', 'Comprueba los datos ingresados y confirma explícitamente lo que has revisado.');
     const summary = resultSummary();
     const card = element('section', 'consumer-result needs-review');
-    card.append(element('span', 'consumer-eyebrow', 'Resultado local · Sin validación externa'), element('h2', '', summary.title), element('p', '', summary.description));
+    card.append(window.MedAlertWeb.icon('warning'), element('span', 'consumer-eyebrow', 'Resultado local · Sin validación externa'), element('h2', '', summary.title), element('p', '', summary.description));
     app.append(card);
-    if (state.signals.length) app.append(element('p', 'consumer-warning', `Señales marcadas: ${state.signals.join(', ')}.${state.signalNote ? ` Nota: ${state.signalNote}` : ''}`));
+    if (state.signals.length) {
+      const warning = element('p', 'consumer-warning');
+      warning.append(window.MedAlertWeb.icon('warning'), element('span', '', `Señales marcadas: ${state.signals.join(', ')}.${state.signalNote ? ` Nota: ${state.signalNote}` : ''}`));
+      app.append(warning);
+    }
     const verification = element('section', 'consumer-verification');
     verification.append(element('h2', '', 'Datos que ingresaste'));
     for (const [label, key] of [
@@ -340,7 +349,11 @@ window.MedAlertConsumer = (() => {
     finish.disabled = !(state.confirmedIdentity && state.confirmedPresentation);
     actions.append(finish);
     app.append(actions);
-    if (state.feedback) app.append(element('p', 'consumer-success', state.feedback));
+    if (state.feedback) {
+      const success = element('p', 'consumer-success');
+      success.append(window.MedAlertWeb.icon('check'), element('span', '', state.feedback));
+      app.append(success);
+    }
   }
 
   function renderSupport() {
@@ -349,7 +362,7 @@ window.MedAlertConsumer = (() => {
       element('section', 'consumer-result needs-review'),
       localNotice('No podemos confirmar si un medicamento es auténtico o seguro. Consulta a un farmacéutico o profesional de salud. Si crees que existe una emergencia, contacta los servicios de emergencia de tu localidad.')
     );
-    app.querySelector('.consumer-result').append(element('h2', '', 'Opciones de consulta'), element('p', '', 'Conserva el empaque y la documentación para mostrarlos a un profesional.'));
+    app.querySelector('.consumer-result').append(window.MedAlertWeb.icon('warning'), element('h2', '', 'Opciones de consulta'), element('p', '', 'Conserva el empaque y la documentación para mostrarlos a un profesional.'));
     app.append(
       button('Volver al resumen', 'button button-secondary', () => { state.step = 'result'; render(); }),
       button('Terminar y borrar fotos de esta sesión', 'button button-primary', () => {

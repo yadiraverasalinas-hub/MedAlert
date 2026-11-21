@@ -392,3 +392,134 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
   .consumer-field-wide,.consumer-actions{grid-column:auto}
   .consumer-data-row{grid-template-columns:1fr;gap:2px}
 }
+
+:root{
+  --surface:#F7FAFC;
+  --structure:#0B3558;
+  --structure-light:#0F4C81;
+  --action:#1F8A70;
+  --text:#18364f;
+  --muted:#526a7d;
+}
+body.native-web .stage{background:var(--surface)}
+#web-app:not([hidden]),#web-app.consumer-mode:not([hidden]){
+  color:var(--text);
+  background:var(--surface);
+  font:16px/1.5 Inter,system-ui,sans-serif;
+}
+.web-sidebar{background:var(--structure);border-color:#0F4C81}
+.web-brand{color:#fff;font-size:18px;font-weight:600}
+.brand-mark{background:var(--structure-light);color:#fff}
+.pharmacy-card strong{color:#fff;font-size:14px}
+.pharmacy-card span,.user-copy small{color:#d2dfeb;font-size:12px}
+.web-nav{gap:7px}
+.nav-link{min-height:44px;color:#e0eaf2;font-size:14px}
+.nav-link:hover,.nav-link.active{background:var(--structure-light);color:#fff}
+.nav-link.active{font-weight:600}
+.nav-icon{width:24px;height:24px}
+.nav-icon .ui-icon{width:22px;height:22px}
+.nav-count{border-color:#f0c4c4;background:#fff2f2;color:#a53a3a}
+.sidebar-create{background:var(--action);font-size:14px}
+.sidebar-create:hover{background:#18745f}
+.mode-switch{border-color:#80c4b1;background:#e8f5f1;color:#176b58;font-size:14px}
+.mode-switch:hover{background:#d9eee7}
+.web-topbar{background:var(--surface)}
+.global-search:focus-within{border-color:var(--action);box-shadow:0 0 0 3px #1f8a7020}
+.web-main{color:var(--text)}
+.avatar{background:#e7f0f5;color:var(--structure)}
+.page-intro h1{color:var(--structure);font-size:32px;font-weight:700;letter-spacing:-.02em}
+.page-intro p{color:var(--muted);font-size:16px}
+.eyebrow{font-size:12px;font-weight:500;letter-spacing:.04em}
+.section-heading h2,.workflow-card h2,.report-panel h2{color:var(--structure);font-size:24px;font-weight:600}
+.section-heading span,.stat-caption,.disclaimer,.form-help,.status-note,.alert-item small{font-size:12px}
+.button{min-height:44px;padding-inline:16px;font-size:16px;font-weight:500}
+.button-primary{border-color:var(--action);background:var(--action);color:#fff}
+.button-primary:hover{border-color:#18745f;background:#18745f}
+.button-secondary{color:var(--structure-light)}
+.button-danger{border-color:#a53a3a;background:#a53a3a;color:#fff}
+.button-danger:hover{border-color:#852d2d;background:#852d2d}
+.button-small{min-height:40px;font-size:14px}
+.button:focus-visible,.nav-link:focus-visible,.mode-switch:focus-visible,.sidebar-create:focus-visible{outline:3px solid #65c7ad;outline-offset:3px}
+.stat-card,.report-panel,.workflow-card,.form-fieldset,.progress-card{background:#fff}
+.stat-label{font-size:14px}
+.stat-value{color:var(--structure);font-size:28px}
+.stat-card.green .stat-value{color:var(--action)}
+.bar-fill.success{background:var(--action)}
+.workflow-icon{background:#edf4f8;color:var(--structure-light)}
+.progress-fill{background:var(--structure-light)}
+.is-done .check-mark{border-color:var(--action);color:var(--action)}
+.check-row.is-done{border-color:#b9e5d1;background:#f1fbf5}
+.check-row.is-done .check-state{border-color:#b9e5d1;background:#f1fbf5;color:#26714f}
+.check-row input,.choice-row input,.consumer-confirm input,.consumer-signal input{accent-color:var(--action)}
+.alert-banner{border-color:#eed7a5;background:#fff9eb;color:#79571a}
+.alert-banner>.ui-icon,.local-only-notice>.ui-icon,.consumer-notice>.ui-icon,.consumer-warning>.ui-icon,.consumer-success>.ui-icon,.consumer-error>.ui-icon{flex:none;width:20px;height:20px}
+.alert-banner p{font-size:14px}
+.records-table th{font-size:12px}
+.records-table td{font-size:14px}
+.guide-cell strong,.product-cell strong,.lot-cell strong,.quantity-cell strong{font-size:14px}
+.guide-cell span,.product-cell span,.lot-cell span,.quantity-cell span{font-size:12px}
+.status-pill{gap:5px;min-height:28px;font-size:12px}
+.status-pill .ui-icon{width:16px;height:16px}
+.status-note{max-width:210px}
+.workflow-card{padding:27px}
+.workflow-card p,.empty-state p{color:var(--muted);font-size:16px}
+.workflow-card h2,.form-panel>h2{font-size:24px}
+.form-fieldset legend{font-size:18px}
+.form-field{font-size:14px;font-weight:500}
+.form-field>input,.form-field>textarea,.form-field>select{min-height:44px;font-size:16px}
+.form-help{font-size:12px}
+.choice-row{font-size:16px}
+.local-only-notice{display:flex;align-items:flex-start;gap:10px;border-color:#c9dce8;background:#edf4f8;color:var(--structure);font-size:14px}
+.comparison-header{font-size:12px}
+.comparison-row{font-size:14px}
+.comparison-status{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:center;gap:4px;font-size:12px}
+.comparison-status .ui-icon{width:16px;height:16px}
+.comparison-status small{grid-column:2;color:var(--muted);font-size:12px;font-weight:400;line-height:1.35}
+.comparison-row.match .comparison-status{color:#26714f}
+.comparison-row.mismatch .comparison-status{color:#a53a3a}
+.comparison-row.missing .comparison-status{color:#79571a}
+.risk-card{position:relative;padding-left:52px}
+.risk-card>.ui-icon{position:absolute;top:17px;left:16px;width:24px;height:24px}
+.risk-card .eyebrow{font-size:12px}
+.risk-card h2{color:var(--structure);font-size:18px;font-weight:600}
+.risk-card p,.alert-item p{font-size:14px}
+.risk-alto>.ui-icon{color:#a53a3a}
+.risk-medio>.ui-icon{color:#8b681f}
+.risk-bajo>.ui-icon{color:#26714f}
+.consumer-shell{color:var(--text);font-size:16px}
+.consumer-header h1{color:var(--structure);font-size:32px}
+.consumer-header p,.consumer-guide ul,.consumer-result p{font-size:16px}
+.consumer-eyebrow{color:var(--structure-light);font-size:12px;font-weight:500}
+.consumer-guide h2,.consumer-verification h2{color:var(--structure);font-size:24px;font-weight:600}
+.consumer-capture-card h3{font-size:18px;font-weight:600}
+.consumer-field{color:#344d63;font-size:14px;font-weight:500}
+.consumer-field>input,.consumer-field>textarea{font-size:16px}
+.consumer-notice,.consumer-warning,.consumer-success,.consumer-error{display:flex;align-items:flex-start;gap:10px;font-size:14px}
+.consumer-notice{border-color:#c9dce8;background:#edf4f8;color:var(--structure)}
+.consumer-warning,.consumer-error{border-color:#eed7a5;background:#fff9eb;color:#79571a}
+.consumer-success{border-color:#b9e5d1;background:#f1fbf5;color:#26714f}
+.consumer-result{position:relative;padding-left:58px;border-color:#eed7a5;background:#fff9eb}
+.consumer-result>.ui-icon{position:absolute;top:21px;left:20px;width:24px;height:24px;color:#8b681f}
+.consumer-result h2,.consumer-result.needs-review h2{color:#79571a;font-size:18px;font-weight:600}
+.consumer-data-row{font-size:14px}
+.consumer-data-row small{font-size:12px}
+.consumer-shell .button{font-size:16px}
+.consumer-stepper li{font-size:14px}
+.consumer-step-number{font-size:12px}
+dialog#confirm-action{width:min(90vw,480px);padding:24px;border:1px solid #d5e0e8;border-radius:14px;box-shadow:0 18px 60px #10253b30}
+#confirm-action h2{margin:0 0 8px;color:var(--structure);font-size:18px;font-weight:600}
+#confirm-action p{margin:0;color:var(--muted);font-size:16px;line-height:1.55}
+#confirm-action .dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:22px}
+#confirm-action .dialog-actions .button{margin:0}
+#confirm-action::backdrop{background:#0b355888;backdrop-filter:blur(2px)}
+#web-app.consumer-mode:not([hidden]){background:var(--surface)}
+.form-field>input:focus,.form-field>textarea:focus,.form-field>select:focus,.consumer-field>input:focus,.consumer-field>textarea:focus{outline:3px solid #1f8a7040;border-color:var(--action)}
+.consumer-highlight{border-left-color:var(--structure-light);background:#edf4f8}
+@media(max-width:760px){
+  .web-sidebar{background:var(--structure)}
+  .nav-link{min-height:42px}
+  .page-intro h1,.consumer-header h1{font-size:28px}
+  .section-heading h2,.workflow-card h2,.form-panel>h2,.consumer-guide h2,.consumer-verification h2{font-size:21px}
+  .web-main{padding:23px 14px}
+  .workflow-card{padding:22px 18px}
+}

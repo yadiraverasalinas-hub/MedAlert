@@ -34,3 +34,7 @@ Los recursos exportados desde Figma se mantienen juntos en `design/` para conser
 La aplicación es una demostración local: el modo consumidor guía una revisión manual y el modo farmacia guarda flujos en este navegador. No ejecuta OCR/IA, no consulta servicios oficiales ni envía reportes. Usa datos ficticios y no ingreses información personal o sensible.
 
 Consulta [`validacion-hus.md`](./validacion-hus.md) para el estado revisado de las HUs Must.
+
+## Guía visual
+
+La interfaz web sigue una paleta 60–30–10: superficies `#F7FAFC`, estructura azul `#0B3558` / `#0F4C81` y acciones principales verde `#1F8A70`. Usa Inter y una escala de títulos, subtítulos, cuerpo, campos y ayudas de 32, 24, 18, 16, 14 y 12 px. Los iconos son SVG de trazo con retícula `24 × 24`; los estados de color incluyen icono, etiqueta y explicación textual. Las acciones sensibles, como poner un bulto en cuarentena, piden confirmación antes de guardar el cambio local.

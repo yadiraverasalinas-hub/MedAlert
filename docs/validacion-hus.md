@@ -38,7 +38,7 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. Se implementaron
 | HU-025 | Funcional en demo local | Se muestra un resumen con explicación simple y opciones prudentes; no certifica el producto. |
 | HU-026 | Funcional en demo local | Se requieren dos confirmaciones explícitas (identidad/concentración y presentación) antes de confirmar la revisión. |
 | HU-027 | Funcional en demo local | Se puede detener el flujo, volver al resumen o borrar las fotos de la sesión y ver opciones de consulta; no hay contacto integrado. |
-| HU-033 | Parcial | “Nueva recepción” está disponible desde la barra lateral y el checklist; inicia con guía/proveedor vacíos. El modo rápido permite ingresar varios bultos de una guía y conserva esos datos solo al añadir el siguiente bulto. No hay captura de imagen ni OCR. |
+| HU-033 | Parcial | “Nueva recepción” está disponible desde la barra lateral y el checklist; inicia con guía/proveedor vacíos. El modo rápido permite ingresar varios bultos de una guía, conserva esos datos al añadir el siguiente y muestra todos los registros en una lista dinámica, sin límite de tres filas. No hay captura de imagen ni OCR. |
 | HU-035 | Funcional en demo local | El checklist es por bulto, guarda el avance y bloquea el contraste hasta completar las seis comprobaciones. |
 | HU-036 | Parcial | El formulario presenta y guarda los datos del empaque en una vista, pero deben ingresarse manualmente; no hay extracción OCR. |
 | HU-037 | Funcional en demo local | Compara los campos ingresados del empaque con los de la guía, expone coincidencias/diferencias y no agrega al inventario si faltan datos o hay diferencias. |

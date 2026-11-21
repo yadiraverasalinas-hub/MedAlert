@@ -175,6 +175,7 @@ window.MedAlertWeb = (() => {
       bell: ['M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9', 'M10 21h4'],
       arrow: ['M4 12h15', 'm13 6 6 6-6 6'],
       info: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'M12 11v5', 'M12 7h.01'],
+      warning: ['M12 3 2 21h20L12 3Z', 'M12 9v4', 'M12 17h.01'],
       check: ['m5 12 4 4L19 6']
     };
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -205,12 +206,39 @@ window.MedAlertWeb = (() => {
     : ['En cuarentena', 'Pendiente', 'En revisión'].includes(status)
       ? 'warning'
       : 'success';
+  const statusExplanation = record => {
+    if (record.status === 'Verificado local') return 'Contraste manual; sin validación de fuentes oficiales.';
+    if (record.status === 'En cuarentena') return record.note || 'Separado del inventario y pendiente de revisión.';
+    if (record.status === 'Observado' || record.status === 'Inconsistencia') return record.note || 'Requiere revisión manual antes de continuar.';
+    return record.note || 'Estado local registrado durante la recepción.';
+  };
 
   function announce(text) {
     const box = document.querySelector('#feedback');
     box.textContent = text;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { box.textContent = ''; }, 4000);
+  }
+
+  function confirmSensitiveAction(titleText, descriptionText, actionLabel, onConfirm) {
+    const dialog = document.querySelector('#confirm-action');
+    const title = element('h2', '', titleText);
+    title.id = 'confirm-action-title';
+    const description = element('p', '', descriptionText);
+    description.id = 'confirm-action-description';
+    const actions = element('div', 'dialog-actions');
+    const cancel = button('Cancelar', 'button button-secondary', () => dialog.close());
+    const confirm = button(actionLabel, 'button button-danger', () => {
+      dialog.close();
+      onConfirm();
+    });
+    confirm.prepend(icon('warning'));
+    actions.append(cancel, confirm);
+    dialog.setAttribute('aria-labelledby', title.id);
+    dialog.setAttribute('aria-describedby', description.id);
+    dialog.replaceChildren(title, description, actions);
+    if (!dialog.open) dialog.showModal();
+    confirm.focus();
   }
 
   function showDetails(record) {
@@ -255,12 +283,19 @@ window.MedAlertWeb = (() => {
     }
     if (record.status !== 'En cuarentena') {
       body.append(button('Enviar a cuarentena', 'button button-secondary', () => {
-        record.status = 'En cuarentena';
-        record.note = 'Pendiente de revisión manual';
-        persistState();
         dialog.close();
-        render(currentId, navigate);
-        announce('Lote separado para revisión.');
+        confirmSensitiveAction(
+          'Confirmar cuarentena',
+          `El bulto ${record.package} de ${record.product} se marcará en cuarentena y quedará fuera del inventario de este navegador.`,
+          'Mover a cuarentena',
+          () => {
+            record.status = 'En cuarentena';
+            record.note = 'Pendiente de revisión manual';
+            persistState();
+            render(currentId, navigate);
+            announce('Lote separado para revisión.');
+          }
+        );
       }));
     }
     if (!dialog.open) dialog.showModal();
@@ -413,7 +448,9 @@ window.MedAlertWeb = (() => {
       const quantity = element('td', 'quantity-cell');
       quantity.append(element('strong', '', record.quantity), element('span', '', 'Unidades comerciales'));
       const status = element('td');
-      status.append(element('span', `status-pill ${statusClass(record.status)}`, record.status), element('span', 'status-note', record.note));
+      const pill = element('span', `status-pill ${statusClass(record.status)}`);
+      pill.append(icon(record.status === 'Verificado local' ? 'check' : record.status === 'Inconsistencia' || record.status === 'Observado' ? 'warning' : 'info'), element('span', '', record.status));
+      status.append(pill, element('span', 'status-note', statusExplanation(record)));
       const action = element('td');
       action.append(button(record.status === 'Verificado local' ? 'Ver detalle' : 'Revisar lote', 'button button-small', () => showDetails(record)));
       row.append(guide, product, lot, quantity, status, action);
@@ -488,8 +525,9 @@ window.MedAlertWeb = (() => {
   }
 
   function addLocalOnlyNotice(parent, text = 'No se ejecuta OCR ni se consultan fuentes oficiales. Verifica los datos en sus documentos originales.') {
-    const notice = element('p', 'local-only-notice', text);
+    const notice = element('p', 'local-only-notice');
     notice.setAttribute('role', 'note');
+    notice.append(icon('info'), element('span', '', text));
     parent.append(notice);
   }
 
@@ -524,6 +562,10 @@ window.MedAlertWeb = (() => {
     form.append(actions);
     panel.append(form);
     addLocalOnlyNotice(panel, 'Datos almacenados solo en este navegador. El nombre del registro no representa una verificación sanitaria.');
+    const recordsHeading = element('div', 'section-heading');
+    recordsHeading.append(element('h2', '', 'Bultos registrados'), element('span', '', `${records.length} en este dispositivo`));
+    main.append(recordsHeading);
+    makeTable(main, records);
     form.addEventListener('input', () => {
       quickDraft.guide = form.elements.guide.value;
       quickDraft.supplier = form.elements.supplier.value;
@@ -680,7 +722,16 @@ window.MedAlertWeb = (() => {
     for (const row of result.rows) {
       const item = element('div', `comparison-row${row.hasBoth ? row.matches ? ' match' : ' mismatch' : ' missing'}`);
       item.append(element('strong', '', row.label), element('span', '', row.packageValue), element('span', '', row.documentValue));
-      item.append(element('span', 'comparison-status', row.hasBoth ? row.matches ? 'Coincide' : 'Diferencia' : 'Sin dato'));
+      const status = element('span', 'comparison-status');
+      const statusLabel = row.hasBoth ? row.matches ? 'Coincide' : 'Diferencia' : 'Sin dato';
+      status.append(
+        icon(row.hasBoth ? row.matches ? 'check' : 'warning' : 'info'),
+        element('span', '', statusLabel),
+        element('small', '', row.hasBoth
+          ? row.matches ? 'El dato del empaque coincide con la guía.' : 'Revisa la diferencia antes de continuar.'
+          : 'Completa el dato faltante para contrastarlo.')
+      );
+      item.append(status);
       table.append(item);
     }
     panel.append(table);
@@ -813,7 +864,7 @@ window.MedAlertWeb = (() => {
     const risk = getRisk(record);
     const panel = addFormPanel(main, `Alertas y clasificación · ${record.product}`, `Producto ${record.product} · Lote ${record.lot || 'sin dato'}`);
     const result = element('section', `risk-card risk-${risk.level.toLowerCase()}`);
-    result.append(element('span', 'eyebrow', 'Clasificación orientativa local'), element('h2', '', `Riesgo ${risk.level}`));
+    result.append(icon(risk.level === 'Alto' ? 'warning' : 'info'), element('span', 'eyebrow', 'Clasificación orientativa local'), element('h2', '', `Riesgo ${risk.level}`));
     result.append(element('p', '', risk.factors.length ? risk.factors.join(' ') : 'No se registraron diferencias manuales ni señales de empaque.'));
     panel.append(result);
     addLocalOnlyNotice(panel, 'Clasificación calculada con reglas locales sobre datos ingresados. No es diagnóstico, evaluación oficial ni consulta de alertas sanitarias.');
@@ -1000,7 +1051,7 @@ window.MedAlertWeb = (() => {
     if (id === '2:5027') {
       makeStats(main);
       const alert = element('div', 'alert-banner');
-      alert.append(element('span', 'alert-dot'), element('p', '', `${records.filter(recordNeedsReview).length} bultos requieren revisión local. Los datos no están verificados por fuentes oficiales.`));
+      alert.append(icon('warning'), element('p', '', `${records.filter(recordNeedsReview).length} bultos requieren revisión local. Los datos no están verificados por fuentes oficiales.`));
       main.append(alert);
       const title = element('div', 'section-heading');
       title.append(element('h2', '', 'Bultos en recepción'), element('span', '', 'Datos de ejemplo y registros de este dispositivo'));
@@ -1081,5 +1132,5 @@ window.MedAlertWeb = (() => {
     }
   }
 
-  return { render, leave };
+  return { render, leave, icon };
 })();
