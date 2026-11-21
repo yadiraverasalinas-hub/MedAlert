@@ -38,7 +38,7 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. Se implementaron
 | HU-025 | Funcional en demo local | Se muestra un resumen con explicación simple y opciones prudentes; no certifica el producto. |
 | HU-026 | Funcional en demo local | Se requieren dos confirmaciones explícitas (identidad/concentración y presentación) antes de confirmar la revisión. |
 | HU-027 | Funcional en demo local | Se puede detener el flujo, volver al resumen o borrar las fotos de la sesión y ver opciones de consulta; no hay contacto integrado. |
-| HU-033 | Parcial | El modo rápido permite ingresar varios bultos de una misma guía y conserva proveedor/guía al continuar. La captura de imagen y el OCR no están implementados. |
+| HU-033 | Parcial | “Nueva recepción” está disponible desde la barra lateral y el checklist; inicia con guía/proveedor vacíos. El modo rápido permite ingresar varios bultos de una guía y conserva esos datos solo al añadir el siguiente bulto. No hay captura de imagen ni OCR. |
 | HU-035 | Funcional en demo local | El checklist es por bulto, guarda el avance y bloquea el contraste hasta completar las seis comprobaciones. |
 | HU-036 | Parcial | El formulario presenta y guarda los datos del empaque en una vista, pero deben ingresarse manualmente; no hay extracción OCR. |
 | HU-037 | Funcional en demo local | Compara los campos ingresados del empaque con los de la guía, expone coincidencias/diferencias y no agrega al inventario si faltan datos o hay diferencias. |
@@ -46,7 +46,7 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. Se implementaron
 | HU-039 | No cumple | No hay contraste automático con fuentes oficiales. |
 | HU-040 | Parcial | Permite registrar alertas internas asociadas a producto y lote, pero no consulta alertas sanitarias oficiales. |
 | HU-041 | Funcional en demo local | Muestra un nivel de riesgo y los factores usados por reglas locales simples; no es una clasificación sanitaria validada. |
-| HU-042 | Funcional en demo local | Permite marcar un bulto como observado con motivo; queda fuera del inventario y se conserva al recargar. |
+| HU-042 | Funcional en demo local | Permite marcar un bulto como observado con motivo; queda fuera del inventario, aparece en la lista y contador de cuarentena, y se conserva al recargar. |
 | HU-043 | Funcional en demo local | Registra la acción, detalle y fecha, y permite ver/imprimir una constancia local. |
 
 ## Hallazgos transversales

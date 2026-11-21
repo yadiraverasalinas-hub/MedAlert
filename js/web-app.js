@@ -152,8 +152,16 @@ window.MedAlertWeb = (() => {
   function recordNeedsReview(record) {
     return !['Verificado local', 'Verificado'].includes(record.status);
   }
+  function quarantineCount() {
+    return records.filter(record => ['Observado', 'En cuarentena'].includes(record.status)).length;
+  }
   function makeId() {
     return `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  function startNewReception() {
+    quickDraft.guide = '';
+    quickDraft.supplier = '';
+    navigate('37:166');
   }
   const icon = (name, className = '') => {
     const paths = {
@@ -280,10 +288,11 @@ window.MedAlertWeb = (() => {
       const navIcon = element('span', 'nav-icon');
       navIcon.append(icon(iconName));
       link.append(navIcon, element('span', 'nav-label', label));
-      if (id === '50:582') link.append(element('span', 'nav-count', String(records.filter(recordNeedsReview).length)));
+      if (id === '50:582') link.append(element('span', 'nav-count', String(quarantineCount())));
       navList.append(link);
     }
     sidebar.append(navList);
+    sidebar.append(button('＋ Nueva recepción', 'sidebar-create', startNewReception));
     sidebar.append(button('Modo consumidor', 'mode-switch', () => {
       if (!window.MedAlertConsumer) {
         announce('El modo consumidor no está disponible en esta carga.');
@@ -326,7 +335,7 @@ window.MedAlertWeb = (() => {
     heading.append(element('div', 'eyebrow', route.eyebrow), element('h1', '', route.title), element('p', '', route.description));
     intro.append(heading);
     if (currentId === '2:5027') {
-      intro.append(button('＋  Nueva recepción', 'button button-primary', () => navigate('37:166')));
+      intro.append(button('＋  Nueva recepción', 'button button-primary', startNewReception));
     } else if (currentId === '37:292') {
       const next = button('Continuar al contraste', 'button button-primary', () => {
         const record = selectedRecord();
@@ -342,6 +351,7 @@ window.MedAlertWeb = (() => {
       next.prepend(icon('arrow'));
       next.disabled = !selectedRecord()?.checks.every(check => check.done);
       intro.append(next);
+      intro.append(button('＋ Nueva recepción', 'button button-secondary', startNewReception));
     } else if (['50:166', '42:166'].includes(currentId)) {
       intro.append(button('↓  Exportar resultados', 'button button-secondary', exportRecords));
     }
@@ -484,11 +494,11 @@ window.MedAlertWeb = (() => {
   }
 
   function renderQuickCapture(main) {
-    const panel = addFormPanel(main, 'Añadir bulto a la recepción', 'Registra cada bulto y continúa con el siguiente sin salir del modo rápido.');
+    const panel = addFormPanel(main, 'Nueva recepción · añadir bultos', 'Ingresa una guía nueva. Puedes guardar un bulto o añadir varios bultos de la misma guía.');
     const form = element('form', 'data-form');
     const guideFields = addFieldset(form, 'Guía y recepción', 'Usa los datos de la guía física.');
-    addFormField(guideFields, 'Número de guía', 'guide', quickDraft.guide || records[0]?.guide || '', { required: true, placeholder: 'Ej. GR-2026-1051' });
-    addFormField(guideFields, 'Proveedor', 'supplier', quickDraft.supplier || records[0]?.supplier || '', { required: true });
+    addFormField(guideFields, 'Número de guía', 'guide', quickDraft.guide || '', { required: true, placeholder: 'Ej. GR-2026-1051' });
+    addFormField(guideFields, 'Proveedor', 'supplier', quickDraft.supplier || '', { required: true });
     addFormField(guideFields, 'Cantidad recibida', 'quantity', '1 caja', { required: true });
     const packageFields = addFieldset(form, 'Datos impresos en el empaque', 'Ingresa los datos manualmente; esta web no ejecuta OCR.');
     addFormField(packageFields, 'Producto y concentración', 'product', '', { required: true });
@@ -1001,12 +1011,19 @@ window.MedAlertWeb = (() => {
     } else if (id === '50:166' || id === '50:582' || id === '42:166') {
       let rows = records;
       if (id === '50:166') rows = records.filter(record => record.status === 'Verificado local');
-      if (id === '50:582') rows = records.filter(recordNeedsReview);
+      if (id === '50:582') rows = records.filter(record => ['Observado', 'En cuarentena'].includes(record.status));
       const section = element('div', 'section-heading');
-      section.append(element('h2', '', id === '50:582' ? 'Productos separados para revisión' : id === '50:166' ? 'Lotes con revisión local completa' : 'Registros de este dispositivo'), element('span', '', `${rows.length} registros`));
+      section.append(element('h2', '', id === '50:582' ? 'Productos observados o en cuarentena' : id === '50:166' ? 'Lotes con revisión local completa' : 'Registros de este dispositivo'), element('span', '', `${rows.length} registros`));
       main.append(section);
       if (id === '50:166') addLocalOnlyNotice(main, 'El inventario muestra solo bultos con checklist completo y contraste manual sin diferencias. No se consultan fuentes oficiales.');
-      makeTable(main, rows, { filter: id !== '50:166' });
+      if (id === '50:582' && !rows.length) {
+        const empty = element('section', 'empty-state');
+        empty.append(element('h2', '', 'No hay productos observados ni en cuarentena'), element('p', '', 'El contador solo incluye bultos marcados como observados o separados en cuarentena. Los pendientes e inconsistencias siguen en recepción.'));
+        empty.append(button('Ir a recepción', 'button button-primary', () => navigate('2:5027')));
+        main.append(empty);
+      } else {
+        makeTable(main, rows, { filter: id !== '50:166' });
+      }
     } else if (id === '42:488') {
       makeStats(main);
       const panel = element('section', 'report-panel');
