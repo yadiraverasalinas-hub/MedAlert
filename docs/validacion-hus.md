@@ -8,11 +8,11 @@
 
 | Estado | Cantidad | Significado |
 |---|---:|---|
-| Funcional en demo local | 18 | La interacción principal está implementada, con límites y datos locales claramente indicados; no implica validación en producción. |
+| Funcional en demo local | 19 | La interacción principal está implementada, con límites y datos locales claramente indicados; no implica validación en producción. |
 | Parcial | 6 | Hay una interacción local, pero no completa la historia o depende de captura/servicios aún ausentes. |
-| No implementada en la web publicada | 6 | La función requiere IA, fuentes oficiales o comparación de nombres que no están disponibles. |
+| No implementada en la web publicada | 5 | La función requiere IA o fuentes oficiales que no están disponibles. |
 
-Por lo tanto, **la web todavía no cumple todas las HUs Must**. El OCR ya propone datos localmente para revisión, pero el análisis de empaque con IA, las consultas oficiales, las alertas sanitarias y el backend siguen pendientes; no se simulan como servicios reales.
+Por lo tanto, **la web todavía no cumple todas las HUs Must**. El OCR propone datos localmente y el catálogo demo ayuda a explorar similitudes, pero el análisis de empaque con IA, las consultas oficiales, las alertas sanitarias y el backend siguen pendientes; no se simulan como servicios reales.
 
 ## Revisión por historia
 
@@ -33,7 +33,7 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. El OCR ya propon
 | HU-020 | Funcional en demo local | Se capturan por separado ambas caras y se requiere confirmación visual antes de avanzar. |
 | HU-021 | Funcional en demo local | Se resaltan los campos importantes y se muestran las sugerencias OCR y el texto reconocido para que adultos mayores o cuidadores puedan comprobarlos visualmente. |
 | HU-022 | Parcial | Se compara literalmente el texto ingresado del medicamento con la indicación ingresada; no se evalúa pertinencia clínica. |
-| HU-023 | No cumple | No hay comparación de nombres/presentaciones ni detección de similitud. |
+| HU-023 | Funcional en demo local | Compara sugerencias OCR/editadas con 30 registros demo y muestra hasta tres candidatos, similitud textual y diferencias de concentración, presentación, fabricante o registro ficticio. Las coincidencias solo por presentación se identifican como tales para no confundirlas con similitud de nombre. No confirma identidad ni sustituye una búsqueda oficial; el catálogo no es exhaustivo. |
 | HU-024 | Funcional en demo local | El usuario ingresa vencimiento y la web indica si la fecha parece vencida según el calendario local. |
 | HU-025 | Funcional en demo local | Se muestra un resumen con explicación simple y opciones prudentes; no certifica el producto. |
 | HU-026 | Funcional en demo local | Se requieren dos confirmaciones explícitas (identidad/concentración y presentación) antes de confirmar la revisión. |
@@ -58,6 +58,8 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. El OCR ya propon
 - La interfaz de farmacia ofrece “Restablecer datos locales” y advierte que no se ingresen datos personales. `Verificado local` significa únicamente comparación manual contra la guía, no validación oficial.
 - El modo consumidor no guarda los datos médicos ni las fotos: estos se mantienen en memoria y se pierden al cerrar/recargar la pestaña.
 - `js/ocr.js` carga Tesseract.js 7 desde jsDelivr al solicitar la primera lectura. Las fotos y transcripciones no se envían a una API ni se guardan en `localStorage`; la librería y sus modelos de idioma sí se descargan desde CDN. No hay integración de IA, fuentes oficiales, alertas sanitarias ni backend.
+- `js/catalog.js` contiene 30 filas proporcionadas para la demostración, con registros marcados `REGISTRO_FICTICIO` y fuente `CATALOGO_DEMO`. La comparación es local y textual; no verifica el registro ni contiene información de lotes o vencimientos.
+- Se probó la comparación en el formulario del modo consumidor con campos editados, incluido un caso de concentración distinta. En recepción rápida de farmacia, dos imágenes sintéticas generaron transcripción OCR y resultados del catálogo con advertencia por concentración diferente; no se guardó el bulto. También se revisó el ranking con coincidencia exacta, error tipográfico, presentación similar y búsqueda sin resultados. Las coincidencias solo por presentación muestran esa limitación explícitamente.
 - Se probó manualmente en navegador: checklist (bloqueo hasta completar 6), recepción de un nuevo bulto, comparación con diferencia, inspección, riesgo/alerta local, observación, acción y constancia persistida; además, captura de ambas caras, revisión manual, confirmaciones, detener y volver al modo farmacia. Se verificó OCR con imágenes sintéticas legibles tanto en el formulario de farmacia como en el modo consumidor: se propusieron campos, se mostró la transcripción, se corrigió una fecha y los cambios manuales sobrevivieron a una segunda lectura. La confianza global de Tesseract no garantiza que cada campo sea correcto; esta prueba no representa etiquetas reales ni mide precisión. En la actualización previa también se verificó un solo botón “Nueva recepción”, que cancelar la confirmación no cambia la inconsistencia, que confirmar la envía a cuarentena y que Historial conserva fecha, acción, bulto y motivo después de recargar. Las fotos de prueba permanecieron en memoria y no se guardó ningún bulto. No hay pruebas automatizadas de aceptación para las 30 HUs.
 
 ## Próximos pasos recomendados
@@ -66,5 +68,5 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. El OCR ya propon
 2. Completar la guía de cámara y captura de evidencia para el modo rápido de farmacia.
 3. Probar y mejorar la extracción OCR con empaques representativos antes de considerar HU-004 completamente cubierta.
 4. Implementar análisis de empaque y fuentes oficiales antes de presentar HU-007–010 y HU-039 como funciones reales.
-5. Añadir un catálogo confiable y criterios de aceptación para comparación de nombres, explicación de riesgo y pertinencia de indicación.
+5. Sustituir el catálogo demo por una fuente autorizada y criterios de aceptación antes de usar similitud para verificar identidad; definir también criterios para riesgo y pertinencia de indicación.
 6. Añadir pruebas de aceptación por HU, incluyendo estados persistidos y errores de servicios externos.

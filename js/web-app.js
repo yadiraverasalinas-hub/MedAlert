@@ -697,10 +697,25 @@ window.MedAlertWeb = (() => {
     ocrStatus.setAttribute('role', 'status');
     ocrStatus.setAttribute('aria-live', 'polite');
     const ocrOutput = element('div', 'ocr-output');
+    const catalogOutput = element('div', 'catalog-output');
+    let catalogEnabled = false;
+    function renderCatalog() {
+      if (!catalogEnabled) return;
+      catalogOutput.replaceChildren();
+      const comparison = window.MedAlertCatalog.renderComparison({
+        name: form.elements.product.value,
+        presentation: form.elements.presentation.value,
+        manufacturer: form.elements.manufacturer.value,
+        registration: form.elements.registration.value
+      });
+      if (comparison) catalogOutput.append(comparison);
+    }
     for (const input of [frontPhoto, backPhoto]) {
       input.addEventListener('change', () => {
         quickOcrRunId++;
         readPhotos.disabled = false;
+        catalogEnabled = false;
+        catalogOutput.replaceChildren();
         ocrOutput.replaceChildren();
         for (const name of Object.values(candidateFields)) {
           const field = form.elements[name];
@@ -713,6 +728,7 @@ window.MedAlertWeb = (() => {
     for (const name of Object.values(candidateFields)) {
       form.elements[name].addEventListener('input', event => {
         event.currentTarget.dataset.ocrSuggestion = 'false';
+        renderCatalog();
       });
     }
     readPhotos.addEventListener('click', async () => {
@@ -733,6 +749,7 @@ window.MedAlertWeb = (() => {
       }
       const runId = ++quickOcrRunId;
       readPhotos.disabled = true;
+      catalogEnabled = false;
       ocrStatus.textContent = 'Preparando OCR local…';
       ocrOutput.replaceChildren();
       try {
@@ -770,6 +787,9 @@ window.MedAlertWeb = (() => {
           transcript.append(section);
         }
         ocrOutput.append(transcript);
+        ocrOutput.append(catalogOutput);
+        catalogEnabled = true;
+        renderCatalog();
         const confidence = results.map(result => result.confidence).filter(Number.isFinite);
         const confidenceNote = confidence.length
           ? ` Confianza global del texto: ${Math.round(confidence.reduce((sum, value) => sum + value, 0) / confidence.length)}%; no indica que cada campo sea correcto.`

@@ -284,8 +284,24 @@ window.MedAlertConsumer = (() => {
       ['Producto indicado en la receta (si corresponde)', 'indication', { wide: true }]
     ]) {
       const input = addField(form, label, key, state.data[key], options);
-      input.addEventListener('input', () => { state.dataSources[key] = 'manual'; });
+      input.addEventListener('input', () => {
+        state.dataSources[key] = 'manual';
+        updateCatalog();
+      });
     }
+    const catalogOutput = element('div', 'catalog-output');
+    function updateCatalog() {
+      catalogOutput.replaceChildren();
+      const comparison = window.MedAlertCatalog.renderComparison({
+        name: form.elements.name.value,
+        presentation: form.elements.presentation.value,
+        manufacturer: form.elements.manufacturer.value,
+        registration: form.elements.registration.value
+      });
+      if (comparison) catalogOutput.append(comparison);
+    }
+    updateCatalog();
+    form.append(catalogOutput);
     const actions = element('div', 'consumer-actions');
     const back = button('Volver a las fotos', 'button button-secondary', () => { state.step = 'capture'; render(); });
     const next = element('button', 'button button-primary', 'Guardar datos e inspeccionar empaque');

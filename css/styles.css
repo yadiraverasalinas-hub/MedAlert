@@ -369,6 +369,21 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
 .consumer-ocr-results section{margin-top:12px}
 .consumer-ocr-results h3{margin:0 0 5px;color:var(--structure);font-size:14px;font-weight:600}
 .consumer-ocr-results pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);font:12px/1.5 ui-monospace,Consolas,monospace}
+.catalog-output{grid-column:1/-1;width:100%}
+.catalog-match{display:grid;gap:10px;margin:12px 0;padding:14px;border:1px solid #c9dce8;border-left:4px solid var(--structure-light);border-radius:9px;background:#fff;color:var(--text)}
+.catalog-match h2{margin:0;color:var(--structure);font-size:18px;font-weight:600}
+.catalog-match>p{margin:0;font-size:14px;line-height:1.5}
+.catalog-match-disclaimer,.catalog-match-footnote{color:var(--muted)}
+.catalog-match-alert{padding:10px 12px;border:1px solid #eed7a5;border-radius:7px;background:#fff9eb;color:#79571a}
+.catalog-match-list{display:grid;gap:10px}
+.catalog-match-item{display:grid;gap:7px;padding:12px;border:1px solid #dfe7ed;border-radius:8px;background:#f8fafc}
+.catalog-match-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.catalog-match-heading h3{margin:0;color:var(--structure);font-size:16px;font-weight:600}
+.catalog-match-score{flex:none;color:var(--structure-light);font-size:12px;font-weight:600}
+.catalog-match-item>p{margin:0;color:var(--text);font-size:13px;line-height:1.45}
+.catalog-match-item .catalog-match-meta{color:var(--muted);font-size:12px}
+.catalog-match-checks{display:grid;gap:3px;margin:0;padding-left:18px;color:var(--text);font-size:12px}
+.catalog-match-empty{padding:10px 12px;border:1px solid #dfe7ed;border-radius:7px;background:#f8fafc}
 .consumer-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:16px 0}
 .consumer-field{display:grid;gap:5px;color:#4d5c70;font-size:.83em;font-weight:600}
 .consumer-field>input,.consumer-field>textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid #d8e1e8;border-radius:8px;background:#fff;color:#25354a;font:inherit}
@@ -401,6 +416,7 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
   .consumer-capture-grid,.consumer-form{grid-template-columns:1fr}
   .consumer-field-wide,.consumer-actions{grid-column:auto}
   .consumer-data-row{grid-template-columns:1fr;gap:2px}
+  .catalog-match-heading{flex-direction:column}
 }
 
 :root{
