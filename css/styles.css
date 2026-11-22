@@ -417,20 +417,21 @@ body.native-web .stage{background:var(--surface)}
   background:var(--surface);
   font:16px/1.5 Inter,system-ui,sans-serif;
 }
-.web-sidebar{background:var(--structure);border-color:#0F4C81}
-.web-brand{color:#fff;font-size:18px;font-weight:600}
-.brand-mark{background:var(--structure-light);color:#fff}
-.pharmacy-card strong{color:#fff;font-size:14px}
-.pharmacy-card span,.user-copy small{color:#d2dfeb;font-size:12px}
+.web-sidebar{background:#fff;border-color:#e3eaf0}
+.web-brand{color:#0d5c75;font-size:18px;font-weight:600}
+.brand-mark{background:#0d5c75;color:#fff}
+.pharmacy-card strong{color:#263548;font-size:14px}
+.pharmacy-card span,.user-copy small{color:#718096;font-size:12px}
 .web-nav{gap:7px}
-.nav-link{min-height:44px;color:#e0eaf2;font-size:14px}
-.nav-link:hover,.nav-link.active{background:var(--structure-light);color:#fff}
+.nav-link{min-height:44px;color:#536176;font-size:14px}
+.nav-link:hover{background:#f4f8fa;color:#0d5c75}
+.nav-link.active{background:#eaf3f7;color:#0d5c75}
 .nav-link.active{font-weight:600}
 .nav-icon{width:24px;height:24px}
 .nav-icon .ui-icon{width:22px;height:22px}
-.nav-count{border-color:#f0c4c4;background:#fff2f2;color:#a53a3a}
-.mode-switch{border-color:#80c4b1;background:#e8f5f1;color:#176b58;font-size:14px}
-.mode-switch:hover{background:#d9eee7}
+.nav-count{border-color:#f3c6c6;background:#fff3f3;color:#a93232}
+.mode-switch{border-color:#c9dce4;background:#f4fafb;color:#0d5c75;font-size:14px}
+.mode-switch:hover{background:#e8f4f4}
 .web-topbar{background:var(--surface)}
 .global-search:focus-within{border-color:var(--action);box-shadow:0 0 0 3px #1f8a7020}
 .web-main{color:var(--text)}
@@ -531,11 +532,12 @@ dialog#confirm-action{width:min(90vw,480px);padding:24px;border:1px solid #d5e0e
 .history-card .records-table td{vertical-align:top}
 .history-action strong{color:var(--structure)}
 .history-reason{min-width:230px;max-width:440px;line-height:1.45}
+.nav-link:focus-visible,.mode-switch:focus-visible{outline:3px solid #43a9bb;outline-offset:2px}
 @media(max-width:760px){
   .status-flow{align-items:flex-start;font-size:13px}
 }
 @media(max-width:760px){
-  .web-sidebar{background:var(--structure)}
+  .web-sidebar{background:#fff}
   .nav-link{min-height:42px}
   .page-intro h1,.consumer-header h1{font-size:28px}
   .section-heading h2,.workflow-card h2,.form-panel>h2,.consumer-guide h2,.consumer-verification h2{font-size:21px}

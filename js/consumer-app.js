@@ -263,7 +263,8 @@ window.MedAlertConsumer = (() => {
     app.append(preview(state.front, 'Frente del empaque'), preview(state.back, 'Reverso del empaque'));
     if (state.ocrResults.length) {
       const recognizedText = element('details', 'consumer-ocr-results');
-      recognizedText.append(element('summary', '', 'Ver texto reconocido en las fotos'));
+      recognizedText.open = true;
+      recognizedText.append(element('summary', '', 'Transcripción OCR · texto reconocido en las fotos'));
       for (const result of state.ocrResults) {
         const section = element('section');
         const confidence = Number.isFinite(result.confidence) ? ` · confianza global ${result.confidence}%` : '';

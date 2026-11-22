@@ -761,7 +761,8 @@ window.MedAlertWeb = (() => {
           }
         }
         const transcript = element('details', 'ocr-transcript');
-        transcript.append(element('summary', '', 'Ver texto reconocido en las fotos'));
+        transcript.open = true;
+        transcript.append(element('summary', '', 'Transcripción OCR · texto reconocido en las fotos'));
         for (const result of results) {
           const section = element('section');
           const confidence = Number.isFinite(result.confidence) ? ` · confianza global ${result.confidence}%` : '';
