@@ -6,6 +6,12 @@ window.MedAlertConsumer = (() => {
     front: null,
     back: null,
     data: {},
+    dataSources: {},
+    ocrStatus: 'idle',
+    ocrMessage: '',
+    ocrResults: [],
+    ocrCandidates: {},
+    ocrRunId: 0,
     signals: [],
     signalNote: '',
     confirmedIdentity: false,
@@ -53,7 +59,7 @@ window.MedAlertConsumer = (() => {
     return figure;
   }
 
-  function localNotice(text = 'Demostración local: no se ejecuta OCR ni IA, no se consultan fuentes oficiales y no se envían datos. No ingreses información personal o sensible.') {
+  function localNotice(text = 'Tesseract.js procesa el OCR en este dispositivo; las fotos no se suben. La primera vez se descargan la librería y sus modelos de idioma. No se conectan IA ni fuentes oficiales.') {
     const note = element('p', 'consumer-notice', text);
     note.setAttribute('role', 'note');
     note.prepend(window.MedAlertWeb.icon('info'));
@@ -92,6 +98,13 @@ window.MedAlertConsumer = (() => {
         return;
       }
       state[side] = file;
+      state.ocrRunId++;
+      state.ocrStatus = 'idle';
+      state.ocrMessage = '';
+      state.ocrResults = [];
+      state.ocrCandidates = {};
+      state.data = {};
+      state.dataSources = {};
       state.captureConfirmed = false;
       state.confirmedIdentity = false;
       state.confirmedPresentation = false;
@@ -136,7 +149,10 @@ window.MedAlertConsumer = (() => {
     controls.append(
       button('A−', 'button button-secondary', () => changeTextScale(-0.1)),
       button('A+', 'button button-secondary', () => changeTextScale(0.1)),
-      button('Volver a farmacia', 'button button-secondary', () => returnToPharmacy())
+      button('Volver a farmacia', 'button button-secondary', () => {
+        state.ocrRunId++;
+        returnToPharmacy();
+      })
     );
     header.append(titleBlock, controls);
     app.append(header, stepper());
@@ -147,6 +163,54 @@ window.MedAlertConsumer = (() => {
   function changeTextScale(amount) {
     state.textScale = Math.min(1.5, Math.max(1, Math.round((state.textScale + amount) * 10) / 10));
     render();
+  }
+
+  function updateOcrProgress(runId, progress) {
+    if (runId !== state.ocrRunId) return;
+    state.ocrMessage = progress.status === 'recognizing text'
+      ? `Leyendo ${progress.label}… ${Math.round(progress.progress * 100)}%`
+      : `Preparando OCR local para ${progress.label.toLocaleLowerCase('es')}…`;
+    const status = root.querySelector('.ocr-status');
+    if (status) status.textContent = state.ocrMessage;
+  }
+
+  async function runOcr() {
+    const runId = ++state.ocrRunId;
+    state.ocrStatus = 'working';
+    state.ocrMessage = 'Preparando OCR local…';
+    state.ocrResults = [];
+    state.feedback = '';
+    render();
+    const images = [
+      { side: 'front', label: 'Frente', file: state.front },
+      { side: 'back', label: 'Reverso', file: state.back }
+    ];
+    try {
+      const results = await window.MedAlertOCR.recognizeImages(images, progress => updateOcrProgress(runId, progress));
+      if (runId !== state.ocrRunId) return;
+      state.ocrResults = results;
+      state.ocrCandidates = window.MedAlertOCR.extractCandidates(results);
+      state.data = { ...state.data };
+      for (const [key, value] of Object.entries(state.ocrCandidates)) {
+        if (value && !state.data[key]) {
+          state.data[key] = value;
+          state.dataSources[key] = 'ocr';
+        }
+      }
+      const recognized = results.filter(result => result.text);
+      state.ocrStatus = recognized.length ? 'complete' : 'empty';
+      const confidence = recognized.map(result => result.confidence).filter(Number.isFinite);
+      const confidenceNote = confidence.length ? ` Confianza global del texto: ${Math.round(confidence.reduce((sum, value) => sum + value, 0) / confidence.length)}%; no indica que cada campo sea correcto.` : '';
+      state.ocrMessage = recognized.length
+        ? `Lectura terminada. Revisa y corrige cada sugerencia antes de continuar.${confidenceNote}`
+        : 'No se encontró texto legible. Puedes continuar e ingresar los datos manualmente.';
+      render();
+    } catch (error) {
+      if (runId !== state.ocrRunId) return;
+      state.ocrStatus = 'error';
+      state.ocrMessage = `No se pudo completar el OCR (${error.message}). Puedes continuar con el ingreso manual.`;
+      render();
+    }
   }
 
   function renderCapture() {
@@ -170,31 +234,57 @@ window.MedAlertConsumer = (() => {
     checkbox.addEventListener('change', () => { state.captureConfirmed = checkbox.checked; render(); });
     confirmation.append(checkbox, element('span', '', 'Confirmo visualmente que ambas caras se ven completas y legibles.'));
     app.append(confirmation);
+    const ocrStatus = element('p', 'ocr-status');
+    ocrStatus.setAttribute('role', 'status');
+    ocrStatus.setAttribute('aria-live', 'polite');
+    ocrStatus.textContent = state.ocrMessage || 'El OCR es una sugerencia automática; revisa todos los datos en el empaque.';
+    app.append(ocrStatus);
     if (state.feedback) {
       const error = element('p', 'consumer-error');
       error.append(window.MedAlertWeb.icon('warning'), element('span', '', state.feedback));
       app.append(error);
     }
+    const read = button('Leer datos de las fotos', 'button button-secondary', () => { void runOcr(); });
+    read.prepend(window.MedAlertWeb.icon('info'));
+    read.disabled = !(state.front && state.back && state.captureConfirmed) || state.ocrStatus === 'working';
+    app.append(read);
     const next = button('Continuar con el ingreso manual', 'button button-primary', () => {
       state.step = 'data';
       state.feedback = '';
       render();
     });
     next.disabled = !(state.front && state.back && state.captureConfirmed);
-    app.append(next, localNotice('Las fotos solo se mantienen en memoria mientras esta pestaña está abierta; no se suben ni se guardan.'));
+    if (state.ocrStatus === 'complete') next.textContent = 'Revisar datos reconocidos';
+    app.append(next, localNotice());
   }
 
   function renderData() {
-    const app = shell('Revisa los datos del empaque', 'Ingresa manualmente lo que lees en las fotos. No hay reconocimiento OCR en esta versión.');
+    const app = shell('Revisa los datos del empaque', 'Confirma cada sugerencia de OCR y corrige cualquier lectura incorrecta antes de continuar.');
     app.append(preview(state.front, 'Frente del empaque'), preview(state.back, 'Reverso del empaque'));
+    if (state.ocrResults.length) {
+      const recognizedText = element('details', 'consumer-ocr-results');
+      recognizedText.append(element('summary', '', 'Ver texto reconocido en las fotos'));
+      for (const result of state.ocrResults) {
+        const section = element('section');
+        const confidence = Number.isFinite(result.confidence) ? ` · confianza global ${result.confidence}%` : '';
+        section.append(element('h3', '', `${result.label}${confidence}`), element('pre', '', result.text || 'No se detectó texto legible.'));
+        recognizedText.append(section);
+      }
+      app.append(recognizedText);
+    }
     const form = element('form', 'consumer-form');
-    addField(form, 'Nombre y concentración', 'name', state.data.name, { required: true, highlight: true });
-    addField(form, 'Presentación', 'presentation', state.data.presentation, { required: true, highlight: true });
-    addField(form, 'Fabricante', 'manufacturer', state.data.manufacturer, { highlight: true });
-    addField(form, 'Lote', 'lot', state.data.lot, { highlight: true });
-    addField(form, 'Vencimiento (mes/año)', 'expiry', state.data.expiry, { type: 'month', required: true, highlight: true });
-    addField(form, 'Registro sanitario impreso', 'registration', state.data.registration, { highlight: true });
-    addField(form, 'Producto indicado en la receta (si corresponde)', 'indication', state.data.indication, { wide: true });
+    for (const [label, key, options] of [
+      ['Nombre y concentración', 'name', { required: true, highlight: true }],
+      ['Presentación', 'presentation', { required: true, highlight: true }],
+      ['Fabricante', 'manufacturer', { highlight: true }],
+      ['Lote', 'lot', { highlight: true }],
+      ['Vencimiento (mes/año)', 'expiry', { type: 'month', required: true, highlight: true }],
+      ['Registro sanitario impreso', 'registration', { highlight: true }],
+      ['Producto indicado en la receta (si corresponde)', 'indication', { wide: true }]
+    ]) {
+      const input = addField(form, label, key, state.data[key], options);
+      input.addEventListener('input', () => { state.dataSources[key] = 'manual'; });
+    }
     const actions = element('div', 'consumer-actions');
     const back = button('Volver a las fotos', 'button button-secondary', () => { state.step = 'capture'; render(); });
     const next = element('button', 'button button-primary', 'Guardar datos e inspeccionar empaque');
@@ -210,7 +300,7 @@ window.MedAlertConsumer = (() => {
       state.step = 'package';
       render();
     });
-    app.append(form, localNotice('Los resaltados identifican campos que debes revisar; no son resultados de OCR ni datos validados.'));
+    app.append(form, localNotice('Los campos sugeridos por OCR se pueden corregir. La lectura no valida el medicamento; compara cada valor con el empaque.'));
   }
 
   function renderPackage() {
@@ -298,7 +388,8 @@ window.MedAlertConsumer = (() => {
       ['Lote', 'lot'], ['Vencimiento', 'expiry'], ['Registro sanitario', 'registration'], ['Indicación en receta', 'indication']
     ]) {
       const row = element('div', 'consumer-data-row');
-      row.append(element('strong', '', label), element('span', '', state.data[key] || 'Sin dato'), element('small', '', 'Ingreso manual · no validado'));
+      const source = state.dataSources[key] === 'ocr' ? 'Sugerencia OCR · requiere revisión manual' : state.dataSources[key] === 'manual' ? 'Ingreso/corrección manual · no validado' : 'Sin lectura automática · no validado';
+      row.append(element('strong', '', label), element('span', '', state.data[key] || 'Sin dato'), element('small', '', source));
       verification.append(row);
     }
     const expiryRow = element('div', 'consumer-data-row');
@@ -368,8 +459,14 @@ window.MedAlertConsumer = (() => {
       button('Terminar y borrar fotos de esta sesión', 'button button-primary', () => {
         state.front = null;
         state.back = null;
+        state.ocrRunId++;
+        state.ocrStatus = 'idle';
+        state.ocrMessage = '';
+        state.ocrResults = [];
+        state.ocrCandidates = {};
         state.captureConfirmed = false;
         state.data = {};
+        state.dataSources = {};
         state.signals = [];
         state.signalNote = '';
         state.confirmedIdentity = false;
@@ -395,8 +492,14 @@ window.MedAlertConsumer = (() => {
     state.step = 'capture';
     state.front = null;
     state.back = null;
+    state.ocrRunId++;
+    state.ocrStatus = 'idle';
+    state.ocrMessage = '';
+    state.ocrResults = [];
+    state.ocrCandidates = {};
     state.captureConfirmed = false;
     state.data = {};
+    state.dataSources = {};
     state.signals = [];
     state.signalNote = '';
     state.confirmedIdentity = false;

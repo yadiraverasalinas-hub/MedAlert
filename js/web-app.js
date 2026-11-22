@@ -129,6 +129,7 @@ window.MedAlertWeb = (() => {
   let currentId = '2:5027';
   let toastTimer;
   const quickDraft = {};
+  let quickOcrRunId = 0;
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -646,7 +647,7 @@ window.MedAlertWeb = (() => {
     return fieldset;
   }
 
-  function addLocalOnlyNotice(parent, text = 'No se ejecuta OCR ni se consultan fuentes oficiales. Verifica los datos en sus documentos originales.') {
+  function addLocalOnlyNotice(parent, text = 'No se consultan fuentes oficiales. Verifica los datos en sus documentos originales.') {
     const notice = element('p', 'local-only-notice');
     notice.setAttribute('role', 'note');
     notice.append(icon('info'), element('span', '', text));
@@ -660,7 +661,22 @@ window.MedAlertWeb = (() => {
     addFormField(guideFields, 'Número de guía', 'guide', quickDraft.guide || '', { required: true, placeholder: 'Ej. GR-2026-1051' });
     addFormField(guideFields, 'Proveedor', 'supplier', quickDraft.supplier || '', { required: true });
     addFormField(guideFields, 'Cantidad recibida', 'quantity', '1 caja', { required: true });
-    const packageFields = addFieldset(form, 'Datos impresos en el empaque', 'Ingresa los datos manualmente; esta web no ejecuta OCR.');
+    const photoFields = addFieldset(form, 'Lectura opcional de fotos', 'Selecciona la cara del empaque que contiene los datos. Cada imagen debe pesar 10 MB o menos.');
+    const frontPhoto = addFormField(photoFields, 'Frente del empaque', 'frontPhoto', '', { type: 'file' });
+    const backPhoto = addFormField(photoFields, 'Reverso del empaque', 'backPhoto', '', { type: 'file' });
+    for (const input of [frontPhoto, backPhoto]) {
+      input.accept = 'image/*';
+      input.setAttribute('capture', 'environment');
+    }
+    const packageFields = addFieldset(form, 'Datos impresos en el empaque', 'Puedes ingresarlos manualmente o completar los campos con sugerencias OCR que debes revisar.');
+    const candidateFields = {
+      name: 'product',
+      presentation: 'presentation',
+      manufacturer: 'manufacturer',
+      lot: 'lot',
+      expiry: 'expiry',
+      registration: 'registration'
+    };
     addFormField(packageFields, 'Producto y concentración', 'product', '', { required: true });
     addFormField(packageFields, 'Presentación', 'presentation', '', { required: true });
     addFormField(packageFields, 'Fabricante', 'manufacturer', '', { required: true });
@@ -674,6 +690,101 @@ window.MedAlertWeb = (() => {
     addFormField(documentFields, 'Fabricante en la guía', 'documentManufacturer', '', { required: true });
     addFormField(documentFields, 'Registro en la guía', 'documentRegistration', '', { required: true });
     const actions = element('div', 'form-actions');
+    const readPhotos = element('button', 'button button-secondary', 'Leer datos de las fotos');
+    readPhotos.type = 'button';
+    readPhotos.prepend(icon('info'));
+    const ocrStatus = element('p', 'form-help ocr-status', 'El OCR no valida el medicamento. Revisa cada valor contra el empaque y completa manualmente lo que falte.');
+    ocrStatus.setAttribute('role', 'status');
+    ocrStatus.setAttribute('aria-live', 'polite');
+    const ocrOutput = element('div', 'ocr-output');
+    for (const input of [frontPhoto, backPhoto]) {
+      input.addEventListener('change', () => {
+        quickOcrRunId++;
+        readPhotos.disabled = false;
+        ocrOutput.replaceChildren();
+        for (const name of Object.values(candidateFields)) {
+          const field = form.elements[name];
+          if (field.dataset.ocrSuggestion === 'true') field.value = '';
+          field.dataset.ocrSuggestion = 'false';
+        }
+        ocrStatus.textContent = 'Foto modificada. Ejecuta el OCR de nuevo y revisa todas las sugerencias.';
+      });
+    }
+    for (const name of Object.values(candidateFields)) {
+      form.elements[name].addEventListener('input', event => {
+        event.currentTarget.dataset.ocrSuggestion = 'false';
+      });
+    }
+    readPhotos.addEventListener('click', async () => {
+      const images = [
+        { side: 'front', label: 'Frente', file: frontPhoto.files[0] },
+        { side: 'back', label: 'Reverso', file: backPhoto.files[0] }
+      ].filter(image => image.file);
+      if (!images.length) {
+        ocrStatus.textContent = 'Selecciona al menos una foto del empaque.';
+        return;
+      }
+      const invalid = images.find(image => !image.file.type.startsWith('image/') || image.file.size > 10 * 1024 * 1024);
+      if (invalid) {
+        ocrStatus.textContent = invalid.file.size > 10 * 1024 * 1024
+          ? 'Cada imagen debe pesar 10 MB o menos.'
+          : 'Elige archivos de imagen válidos.';
+        return;
+      }
+      const runId = ++quickOcrRunId;
+      readPhotos.disabled = true;
+      ocrStatus.textContent = 'Preparando OCR local…';
+      ocrOutput.replaceChildren();
+      try {
+        const results = await window.MedAlertOCR.recognizeImages(images, progress => {
+          if (runId !== quickOcrRunId) return;
+          ocrStatus.textContent = progress.status === 'recognizing text'
+            ? `Leyendo ${progress.label}… ${Math.round(progress.progress * 100)}%`
+            : `Preparando OCR local para ${progress.label.toLocaleLowerCase('es')}…`;
+        });
+        const candidates = window.MedAlertOCR.extractCandidates(results);
+        if (runId !== quickOcrRunId) return;
+        for (const name of Object.values(candidateFields)) {
+          const input = form.elements[name];
+          if (input.dataset.ocrSuggestion === 'true') input.value = '';
+          input.dataset.ocrSuggestion = 'false';
+        }
+        for (const [candidateName, candidateValue] of Object.entries(candidates)) {
+          const name = candidateFields[candidateName];
+          const input = form.elements[name];
+          const value = candidateName === 'expiry' && /^\d{4}-\d{2}$/.test(candidateValue)
+            ? candidateValue.replace(/^(\d{4})-(\d{2})$/, '$2/$1')
+            : candidateValue;
+          if (value && !input.value.trim()) {
+            input.value = value;
+            input.dataset.ocrSuggestion = 'true';
+          }
+        }
+        const transcript = element('details', 'ocr-transcript');
+        transcript.append(element('summary', '', 'Ver texto reconocido en las fotos'));
+        for (const result of results) {
+          const section = element('section');
+          const confidence = Number.isFinite(result.confidence) ? ` · confianza global ${result.confidence}%` : '';
+          section.append(element('h3', '', `${result.label}${confidence}`), element('pre', '', result.text || 'No se detectó texto legible.'));
+          transcript.append(section);
+        }
+        ocrOutput.append(transcript);
+        const confidence = results.map(result => result.confidence).filter(Number.isFinite);
+        const confidenceNote = confidence.length
+          ? ` Confianza global del texto: ${Math.round(confidence.reduce((sum, value) => sum + value, 0) / confidence.length)}%; no indica que cada campo sea correcto.`
+          : '';
+        ocrStatus.textContent = results.some(result => result.text)
+          ? `Lectura terminada. Revisa y corrige las sugerencias; completa los campos obligatorios.${confidenceNote}`
+          : 'No se encontró texto legible. Ingresa los datos manualmente.';
+      } catch (error) {
+        if (runId === quickOcrRunId) {
+          ocrStatus.textContent = `No se pudo completar el OCR (${error.message}). Puedes ingresar los datos manualmente.`;
+        }
+      } finally {
+        if (runId === quickOcrRunId) readPhotos.disabled = false;
+      }
+    });
+    actions.append(readPhotos, ocrStatus, ocrOutput);
     const addAndContinue = element('button', 'button button-primary', 'Guardar bulto y abrir checklist');
     addAndContinue.type = 'submit';
     addAndContinue.value = 'checklist';
@@ -683,7 +794,7 @@ window.MedAlertWeb = (() => {
     actions.append(addAndContinue, addNext);
     form.append(actions);
     panel.append(form);
-    addLocalOnlyNotice(panel, 'Datos almacenados solo en este navegador. El nombre del registro no representa una verificación sanitaria.');
+    addLocalOnlyNotice(panel, 'Los datos se guardan en este navegador. Las fotos se procesan aquí y no se guardan ni se suben; revisa cada sugerencia manualmente. Esto no es una verificación sanitaria.');
     const recordsHeading = element('div', 'section-heading');
     recordsHeading.append(element('h2', '', 'Bultos registrados'), element('span', '', `${records.length} en este dispositivo`));
     main.append(recordsHeading);
@@ -1178,6 +1289,7 @@ window.MedAlertWeb = (() => {
   }
 
   function render(id, onNavigate) {
+    if (currentId !== id) quickOcrRunId++;
     currentId = id;
     navigate = onNavigate;
     const root = document.querySelector('#web-app');
