@@ -31,7 +31,7 @@ Los recursos exportados desde Figma se mantienen juntos en `design/` para conser
 
 ## Nota
 
-La aplicación es una demostración local: el modo consumidor guía una revisión manual y el modo farmacia guarda flujos en este navegador. No ejecuta OCR/IA, no consulta servicios oficiales ni envía reportes. Usa datos ficticios y no ingreses información personal o sensible.
+La aplicación es una demostración local: el modo consumidor guía una revisión manual y el modo farmacia guarda flujos e historial de acciones en este navegador. El historial puede exportarse, pero no es inmutable ni compartido; al restablecer los datos locales también se borra. La web no ejecuta OCR/IA, no consulta servicios oficiales ni envía reportes. Usa datos ficticios y no ingreses información personal o sensible.
 
 Consulta [`validacion-hus.md`](./validacion-hus.md) para el estado revisado de las HUs Must.
 

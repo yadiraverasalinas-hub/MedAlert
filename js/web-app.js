@@ -63,7 +63,24 @@ window.MedAlertWeb = (() => {
       createdAt: record.createdAt || new Date().toISOString()
     };
   }
+  function normalizeHistoryEntry(entry, index) {
+    const timestamp = typeof entry.at === 'string' ? entry.at : '';
+    const parsedTimestamp = new Date(timestamp);
+    return {
+      id: typeof entry.id === 'string' ? entry.id : `history-${index + 1}`,
+      at: timestamp && !Number.isNaN(parsedTimestamp.getTime()) ? timestamp : new Date(0).toISOString(),
+      action: typeof entry.action === 'string' ? entry.action : 'Acción registrada',
+      recordId: typeof entry.recordId === 'string' ? entry.recordId : '',
+      package: typeof entry.package === 'string' ? entry.package : 'Sin bulto',
+      product: typeof entry.product === 'string' ? entry.product : 'Sin producto',
+      guide: typeof entry.guide === 'string' ? entry.guide : 'Sin guía',
+      reason: typeof entry.reason === 'string' ? entry.reason : 'Sin motivo registrado.'
+    };
+  }
   const records = (savedState?.records || seedRecords).map(normalizeRecord);
+  const actionHistory = Array.isArray(savedState?.actionHistory)
+    ? savedState.actionHistory.filter(entry => entry && typeof entry === 'object').map(normalizeHistoryEntry)
+    : [];
   let selectedRecordId = records.some(record => record.id === savedState?.selectedRecordId)
     ? savedState.selectedRecordId
     : records[0]?.id;
@@ -72,7 +89,7 @@ window.MedAlertWeb = (() => {
     '2:5027': { section: 'Recepción', eyebrow: 'Operación diaria / Recepción', title: 'Recepción de mercadería', description: 'Revisa cada lote antes de ingresarlo al inventario.' },
     '50:166': { section: 'Inventario', eyebrow: 'Operación diaria / Inventario', title: 'Inventario de lotes', description: 'Consulta los productos y lotes registrados en la farmacia.' },
     '50:582': { section: 'Cuarentena', eyebrow: 'Control de calidad / Cuarentena', title: 'Lotes en cuarentena', description: 'Mantén separados los productos que requieren una revisión.' },
-    '42:166': { section: 'Historial', eyebrow: 'Consultas / Historial', title: 'Historial de verificaciones', description: 'Localiza verificaciones e irregularidades anteriores.' },
+    '42:166': { section: 'Historial', eyebrow: 'Consultas / Historial', title: 'Historial de acciones', description: 'Revisa la fecha, el bulto y el motivo de cada acción registrada.' },
     '42:488': { section: 'Reportes', eyebrow: 'Consultas / Reportes', title: 'Indicadores de recepción', description: 'Un resumen del trabajo registrado en este entorno de demostración.' },
     '42:723': { section: 'Permisos', eyebrow: 'Administración / Permisos', title: 'Permisos por rol', description: 'Revisa qué acciones están disponibles para cada perfil.' },
     '2:5251': { section: 'Recepción', eyebrow: 'Operación diaria / Recepción', title: 'Detalle de recepción', description: 'Revisa los registros y las observaciones de esta entrega.' },
@@ -121,7 +138,7 @@ window.MedAlertWeb = (() => {
   };
   function persistState() {
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ records, selectedRecordId }));
+      localStorage.setItem(storageKey, JSON.stringify({ records, selectedRecordId, actionHistory }));
       return true;
     } catch (error) {
       announce(`No se guardaron los cambios en este dispositivo (${error.message}).`);
@@ -137,6 +154,7 @@ window.MedAlertWeb = (() => {
       return;
     }
     records.splice(0, records.length, ...seedRecords.map(normalizeRecord));
+    actionHistory.splice(0, actionHistory.length);
     selectedRecordId = records[0]?.id;
     render(currentId, navigate);
     announce('Datos locales eliminados; se restauraron los ejemplos.');
@@ -157,6 +175,20 @@ window.MedAlertWeb = (() => {
   }
   function makeId() {
     return `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  function logAction(record, action, reason, at = new Date().toISOString()) {
+    const entry = normalizeHistoryEntry({
+      id: makeId(),
+      at,
+      action,
+      recordId: record.id,
+      package: record.package,
+      product: record.product,
+      guide: record.guide,
+      reason
+    });
+    actionHistory.unshift(entry);
+    return entry;
   }
   function startNewReception() {
     quickDraft.guide = '';
@@ -208,7 +240,7 @@ window.MedAlertWeb = (() => {
       : 'success';
   const statusExplanation = record => {
     if (record.status === 'Verificado local') return 'Contraste manual; sin validación de fuentes oficiales.';
-    if (record.status === 'En cuarentena') return record.note || 'Separado del inventario y pendiente de revisión.';
+    if (record.status === 'En cuarentena') return record.quarantineReason || record.note || 'Separado del inventario y pendiente de revisión.';
     if (record.status === 'Observado' || record.status === 'Inconsistencia') return record.note || 'Requiere revisión manual antes de continuar.';
     return record.note || 'Estado local registrado durante la recepción.';
   };
@@ -241,6 +273,37 @@ window.MedAlertWeb = (() => {
     confirm.focus();
   }
 
+  function quarantineRecord(record, reason = record.note) {
+    if (record.status === 'En cuarentena') return;
+    const at = new Date().toISOString();
+    const rationale = reason?.trim() || 'Separado para revisión manual.';
+    record.status = 'En cuarentena';
+    record.quarantineReason = rationale;
+    record.note = 'En cuarentena; pendiente de revisión manual.';
+    record.actions.push({
+      type: 'quarantine',
+      label: 'Enviar a cuarentena',
+      description: rationale,
+      createdAt: at
+    });
+    logAction(record, 'Enviado a cuarentena', rationale, at);
+    persistState();
+    render(currentId, navigate);
+    announce('Lote separado para revisión.');
+  }
+
+  function requestQuarantine(record) {
+    const reason = record.status === 'Inconsistencia'
+      ? record.note
+      : record.quarantineReason || record.note;
+    confirmSensitiveAction(
+      'Confirmar cuarentena',
+      `El bulto ${record.package} de ${record.product} se marcará en cuarentena y quedará fuera del inventario de este navegador. Motivo: ${reason || 'Separación para revisión manual.'}`,
+      'Mover a cuarentena',
+      () => quarantineRecord(record, reason)
+    );
+  }
+
   function showDetails(record) {
     selectedRecordId = record.id;
     persistState();
@@ -252,7 +315,7 @@ window.MedAlertWeb = (() => {
       ['Guía', record.guide], ['Bulto', record.package], ['Proveedor', record.supplier],
       ['Fabricante (dato ingresado)', record.manufacturer], ['Registro (dato ingresado)', record.registration || 'Sin dato'],
       ['Lote', record.lot], ['Vencimiento', record.expiry], ['Cantidad', record.quantity],
-      ['Estado', record.status], ['Observación', record.note]
+      ['Estado', record.status], ['Observación', record.status === 'En cuarentena' ? record.quarantineReason || record.note : record.note]
     ];
     for (const [label, value] of fields) {
       const row = element('p', 'detail-row');
@@ -284,18 +347,7 @@ window.MedAlertWeb = (() => {
     if (record.status !== 'En cuarentena') {
       body.append(button('Enviar a cuarentena', 'button button-secondary', () => {
         dialog.close();
-        confirmSensitiveAction(
-          'Confirmar cuarentena',
-          `El bulto ${record.package} de ${record.product} se marcará en cuarentena y quedará fuera del inventario de este navegador.`,
-          'Mover a cuarentena',
-          () => {
-            record.status = 'En cuarentena';
-            record.note = 'Pendiente de revisión manual';
-            persistState();
-            render(currentId, navigate);
-            announce('Lote separado para revisión.');
-          }
-        );
+        requestQuarantine(record);
       }));
     }
     if (!dialog.open) dialog.showModal();
@@ -327,7 +379,6 @@ window.MedAlertWeb = (() => {
       navList.append(link);
     }
     sidebar.append(navList);
-    sidebar.append(button('＋ Nueva recepción', 'sidebar-create', startNewReception));
     sidebar.append(button('Modo consumidor', 'mode-switch', () => {
       if (!window.MedAlertConsumer) {
         announce('El modo consumidor no está disponible en esta carga.');
@@ -378,7 +429,10 @@ window.MedAlertWeb = (() => {
           announce('Completa las seis comprobaciones antes de continuar.');
           return;
         }
-        record.checklistCompletedAt = new Date().toISOString();
+        if (!record.checklistCompletedAt) {
+          record.checklistCompletedAt = new Date().toISOString();
+          logAction(record, 'Checklist completado', 'Se completaron las seis comprobaciones de recepción.', record.checklistCompletedAt);
+        }
         persistState();
         navigate('37:435');
       });
@@ -414,6 +468,61 @@ window.MedAlertWeb = (() => {
       wrap.append(card);
     }
     main.append(wrap);
+  }
+
+  function addStatusFlow(main) {
+    const legend = element('p', 'status-flow');
+    legend.setAttribute('role', 'note');
+    legend.append(
+      icon('info'),
+      element('span', '', 'Recorrido: Pendiente → Verificado local (inventario) o Inconsistencia → Observado / En cuarentena.')
+    );
+    main.append(legend);
+  }
+
+  function renderActionHistory(main) {
+    const heading = element('div', 'section-heading');
+    heading.append(
+      element('h2', '', 'Registro de acciones'),
+      element('span', '', `${actionHistory.length} ${actionHistory.length === 1 ? 'acción' : 'acciones'} en este dispositivo`)
+    );
+    main.append(heading);
+    addLocalOnlyNotice(main, 'Registro local de evidencia para esta demostración. Las fechas y motivos dependen de lo ingresado por el personal.');
+    if (!actionHistory.length) {
+      const empty = element('section', 'empty-state');
+      empty.append(
+        element('h2', '', 'Todavía no hay acciones registradas'),
+        element('p', '', 'Al recibir, completar el checklist, contrastar o separar un bulto, la actividad aparecerá aquí con su fecha y motivo.')
+      );
+      main.append(empty);
+      return;
+    }
+    const card = element('div', 'table-card history-card');
+    const table = element('table', 'records-table');
+    const head = element('thead');
+    const header = element('tr');
+    for (const label of ['Fecha y hora', 'Acción', 'Bulto', 'Motivo']) header.append(element('th', '', label));
+    head.append(header);
+    const body = element('tbody');
+    for (const entry of actionHistory) {
+      const row = element('tr');
+      row.dataset.search = [entry.action, entry.package, entry.product, entry.guide, entry.reason].join(' ').toLocaleLowerCase('es');
+      const dateCell = element('td');
+      const date = element('time');
+      date.dateTime = entry.at;
+      date.textContent = new Date(entry.at).toLocaleString('es-PE');
+      dateCell.append(date);
+      const actionCell = element('td', 'history-action');
+      actionCell.append(element('strong', '', entry.action));
+      const packageCell = element('td', 'guide-cell');
+      packageCell.append(element('strong', '', entry.package), element('span', '', `${entry.product} · ${entry.guide}`));
+      const reasonCell = element('td', 'history-reason', entry.reason);
+      row.append(dateCell, actionCell, packageCell, reasonCell);
+      body.append(row);
+    }
+    table.append(head, body);
+    card.append(table);
+    main.append(card);
   }
 
   function makeTable(main, rows, { filter = true } = {}) {
@@ -452,7 +561,14 @@ window.MedAlertWeb = (() => {
       pill.append(icon(record.status === 'Verificado local' ? 'check' : record.status === 'Inconsistencia' || record.status === 'Observado' ? 'warning' : 'info'), element('span', '', record.status));
       status.append(pill, element('span', 'status-note', statusExplanation(record)));
       const action = element('td');
-      action.append(button(record.status === 'Verificado local' ? 'Ver detalle' : 'Revisar lote', 'button button-small', () => showDetails(record)));
+      const actions = element('div', 'row-actions');
+      actions.append(button(record.status === 'Verificado local' ? 'Ver detalle' : 'Revisar lote', 'button button-small', () => showDetails(record)));
+      if (record.status === 'Inconsistencia') {
+        const quarantine = button('Enviar a cuarentena', 'button button-small button-danger', () => requestQuarantine(record));
+        quarantine.prepend(icon('warning'));
+        actions.append(quarantine);
+      }
+      action.append(actions);
       row.append(guide, product, lot, quantity, status, action);
       body.append(row);
     }
@@ -481,13 +597,19 @@ window.MedAlertWeb = (() => {
   }
 
   function exportRecords() {
-    const rows = records.map(record => [record.guide, record.package, record.product, record.lot, record.expiry, record.quantity, record.status]);
-    const csv = [['Guía', 'Bulto', 'Producto', 'Lote', 'Vencimiento', 'Cantidad', 'Estado'], ...rows]
+    const isHistory = currentId === '42:166';
+    const rows = isHistory
+      ? actionHistory.map(entry => [new Date(entry.at).toLocaleString('es-PE'), entry.action, entry.package, entry.product, entry.guide, entry.reason])
+      : records.map(record => [record.guide, record.package, record.product, record.lot, record.expiry, record.quantity, record.status]);
+    const headers = isHistory
+      ? ['Fecha y hora', 'Acción', 'Bulto', 'Producto', 'Guía', 'Motivo']
+      : ['Guía', 'Bulto', 'Producto', 'Lote', 'Vencimiento', 'Cantidad', 'Estado'];
+    const csv = [headers, ...rows]
       .map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
     const link = element('a');
     link.href = url;
-    link.download = 'MedAlert-registros.csv';
+    link.download = isHistory ? 'MedAlert-historial-acciones.csv' : 'MedAlert-registros.csv';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
@@ -604,6 +726,7 @@ window.MedAlertWeb = (() => {
       }, records.length);
       records.unshift(record);
       selectedRecordId = record.id;
+      logAction(record, 'Bulto recibido', 'Registro manual de recepción.', record.createdAt);
       persistState();
       if (event.submitter?.value === 'next') {
         announce(`${record.package} guardado localmente. Puedes registrar el siguiente bulto.`);
@@ -641,6 +764,10 @@ window.MedAlertWeb = (() => {
         if (!check.done && record.status === 'Verificado local') {
           record.status = 'En revisión';
           record.note = 'Checklist modificado; requiere nueva revisión.';
+        }
+        if (record.checks.every(item => item.done) && !record.checklistCompletedAt) {
+          record.checklistCompletedAt = new Date().toISOString();
+          logAction(record, 'Checklist completado', 'Se completaron las seis comprobaciones de recepción.', record.checklistCompletedAt);
         }
         persistState();
         updateProgress();
@@ -760,6 +887,7 @@ window.MedAlertWeb = (() => {
       const data = Object.fromEntries(new FormData(form).entries());
       record.document = { ...record.document, ...data };
       record.comparisonAt = new Date().toISOString();
+      logAction(record, record.status === 'Inconsistencia' ? 'Contraste: inconsistencia' : 'Contraste completado', record.note, record.comparisonAt);
       persistState();
       announce('Datos de guía guardados en este dispositivo.');
       render(currentId, navigate);
@@ -828,6 +956,7 @@ window.MedAlertWeb = (() => {
         record.status = 'Inconsistencia';
         record.note = `Señales del empaque: ${record.inspection.join(', ')}.`;
       }
+      logAction(record, 'Inspección registrada', record.inspection.length ? record.note : 'Inspección manual; no se registraron señales.', record.inspectionAt);
       persistState();
       announce('Inspección guardada localmente.');
       render(currentId, navigate);
@@ -888,6 +1017,7 @@ window.MedAlertWeb = (() => {
       if (!alertForm.reportValidity()) return;
       const data = Object.fromEntries(new FormData(alertForm).entries());
       record.alerts.push({ title: data.title.trim(), description: data.description.trim(), createdAt: new Date().toISOString() });
+      logAction(record, 'Alerta interna registrada', `${data.title.trim()}: ${data.description.trim()}`);
       persistState();
       announce('Alerta interna guardada; no fue enviada a ninguna autoridad.');
       render(currentId, navigate);
@@ -919,6 +1049,7 @@ window.MedAlertWeb = (() => {
       record.observedNote = reason;
       record.note = reason;
       record.observedAt = new Date().toISOString();
+      logAction(record, 'Marcado como observado', reason, record.observedAt);
       persistState();
       announce('Producto observado y excluido del inventario local.');
       navigate('41:414');
@@ -964,9 +1095,21 @@ window.MedAlertWeb = (() => {
         description,
         createdAt: new Date().toISOString()
       };
+      if (action.type === 'quarantine') {
+        confirmSensitiveAction(
+          'Confirmar cuarentena',
+          `El bulto ${record.package} de ${record.product} se separará del inventario. Motivo: ${description}`,
+          'Confirmar y enviar',
+          () => {
+            quarantineRecord(record, description);
+            navigate('41:679');
+          }
+        );
+        return;
+      }
       record.actions.push(action);
       record.note = `${action.label}: ${description}`;
-      if (action.type === 'quarantine') record.status = 'En cuarentena';
+      logAction(record, action.label, description, action.createdAt);
       persistState();
       navigate('41:679');
     });
@@ -1053,18 +1196,21 @@ window.MedAlertWeb = (() => {
       const alert = element('div', 'alert-banner');
       alert.append(icon('warning'), element('p', '', `${records.filter(recordNeedsReview).length} bultos requieren revisión local. Los datos no están verificados por fuentes oficiales.`));
       main.append(alert);
+      addStatusFlow(main);
       const title = element('div', 'section-heading');
       title.append(element('h2', '', 'Bultos en recepción'), element('span', '', 'Datos de ejemplo y registros de este dispositivo'));
       title.append(button('Restablecer datos locales', 'button button-secondary', resetLocalData));
       main.append(title);
       makeTable(main, records);
       main.append(element('p', 'disclaimer', 'El estado “Verificado local” solo indica una comparación manual en este navegador; no representa una consulta oficial.'));
-    } else if (id === '50:166' || id === '50:582' || id === '42:166') {
+    } else if (id === '42:166') {
+      renderActionHistory(main);
+    } else if (id === '50:166' || id === '50:582') {
       let rows = records;
       if (id === '50:166') rows = records.filter(record => record.status === 'Verificado local');
       if (id === '50:582') rows = records.filter(record => ['Observado', 'En cuarentena'].includes(record.status));
       const section = element('div', 'section-heading');
-      section.append(element('h2', '', id === '50:582' ? 'Productos observados o en cuarentena' : id === '50:166' ? 'Lotes con revisión local completa' : 'Registros de este dispositivo'), element('span', '', `${rows.length} registros`));
+      section.append(element('h2', '', id === '50:582' ? 'Productos observados o en cuarentena' : 'Lotes con revisión local completa'), element('span', '', `${rows.length} registros`));
       main.append(section);
       if (id === '50:166') addLocalOnlyNotice(main, 'El inventario muestra solo bultos con checklist completo y contraste manual sin diferencias. No se consultan fuentes oficiales.');
       if (id === '50:582' && !rows.length) {

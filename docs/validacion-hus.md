@@ -38,26 +38,27 @@ Por lo tanto, **la web todavía no cumple todas las HUs Must**. Se implementaron
 | HU-025 | Funcional en demo local | Se muestra un resumen con explicación simple y opciones prudentes; no certifica el producto. |
 | HU-026 | Funcional en demo local | Se requieren dos confirmaciones explícitas (identidad/concentración y presentación) antes de confirmar la revisión. |
 | HU-027 | Funcional en demo local | Se puede detener el flujo, volver al resumen o borrar las fotos de la sesión y ver opciones de consulta; no hay contacto integrado. |
-| HU-033 | Parcial | “Nueva recepción” está disponible desde la barra lateral y el checklist; inicia con guía/proveedor vacíos. El modo rápido permite ingresar varios bultos de una guía, conserva esos datos al añadir el siguiente y muestra todos los registros en una lista dinámica, sin límite de tres filas. No hay captura de imagen ni OCR. |
+| HU-033 | Parcial | “Nueva recepción” aparece una sola vez por pantalla (en la recepción y en el checklist), evitando duplicar la acción en la barra lateral y el encabezado. El modo rápido permite ingresar varios bultos de una guía, conserva esos datos al añadir el siguiente y muestra todos los registros, sin límite de tres filas. No hay captura de imagen ni OCR. |
 | HU-035 | Funcional en demo local | El checklist es por bulto, guarda el avance y bloquea el contraste hasta completar las seis comprobaciones. |
 | HU-036 | Parcial | El formulario presenta y guarda los datos del empaque en una vista, pero deben ingresarse manualmente; no hay extracción OCR. |
-| HU-037 | Funcional en demo local | Compara los campos ingresados del empaque con los de la guía, expone coincidencias/diferencias y no agrega al inventario si faltan datos o hay diferencias. |
+| HU-037 | Funcional en demo local | Compara los campos ingresados del empaque con los de la guía, expone coincidencias/diferencias y no agrega al inventario si faltan datos o hay diferencias. En una inconsistencia ofrece una acción directa para enviarla a cuarentena, con confirmación y conservación del motivo. |
 | HU-038 | Funcional en demo local | Permite registrar señales del empaque y una observación; se guardan por bulto y afectan la clasificación local. |
 | HU-039 | No cumple | No hay contraste automático con fuentes oficiales. |
 | HU-040 | Parcial | Permite registrar alertas internas asociadas a producto y lote, pero no consulta alertas sanitarias oficiales. |
 | HU-041 | Funcional en demo local | Muestra un nivel de riesgo y los factores usados por reglas locales simples; no es una clasificación sanitaria validada. |
-| HU-042 | Funcional en demo local | Permite marcar un bulto como observado con motivo; queda fuera del inventario, aparece en la lista y contador de cuarentena, y se conserva al recargar. |
-| HU-043 | Funcional en demo local | Registra la acción, detalle y fecha, y permite ver/imprimir una constancia local. |
+| HU-042 | Funcional en demo local | Permite marcar un bulto como observado con motivo o enviar directamente una inconsistencia a cuarentena. La acción requiere confirmación, conserva el motivo, excluye el bulto del inventario y actualiza la lista y contador local. |
+| HU-043 | Funcional en demo local | Registra acciones con fecha, tipo, bulto y motivo en la pantalla Historial; el registro persiste en este navegador, puede exportarse como CSV y complementa la constancia local. No es una auditoría de servidor ni un registro inmutable. |
 
 ## Hallazgos transversales
 
 - `index.html` fija la aplicación en edición `web`; incluye un modo consumidor nativo con pasos accesibles, no las pantallas móviles exportadas de Figma.
 - `js/main.js` carga las pantallas desde archivos `design/<id>.js`. En el proyecto hay módulos para las 17 pantallas web, pero no para las 38 pantallas `celular` que aparecen en los metadatos de diseño. Por tanto, esas pantallas no son una implementación ejecutable.
 - La web inicia con seis registros de ejemplo. Los nuevos registros, checklist, comparaciones, inspecciones, alertas y acciones se guardan en `localStorage` de este navegador; no se comparten ni sincronizan con otros dispositivos.
+- Historial conserva localmente eventos de recepción, checklist completo, contraste, inspección, alertas internas, observación y cuarentena. “Restablecer datos locales” también borra ese historial; no sirve como evidencia inmutable o compartida.
 - La interfaz de farmacia ofrece “Restablecer datos locales” y advierte que no se ingresen datos personales. `Verificado local` significa únicamente comparación manual contra la guía, no validación oficial.
 - El modo consumidor no guarda los datos médicos ni las fotos: estos se mantienen en memoria y se pierden al cerrar/recargar la pestaña.
 - La búsqueda del código no encontró integración con OCR, IA, `fetch`/API de fuentes oficiales ni servicio de alertas.
-- Se probó manualmente en navegador: checklist (bloqueo hasta completar 6), recepción de un nuevo bulto, comparación con diferencia, inspección, riesgo/alerta local, observación, acción y constancia persistida; además, captura de ambas caras, revisión manual, confirmaciones, detener y volver al modo farmacia. No hubo errores JavaScript en estos recorridos. No hay pruebas automatizadas de aceptación para las 30 HUs.
+- Se probó manualmente en navegador: checklist (bloqueo hasta completar 6), recepción de un nuevo bulto, comparación con diferencia, inspección, riesgo/alerta local, observación, acción y constancia persistida; además, captura de ambas caras, revisión manual, confirmaciones, detener y volver al modo farmacia. En esta actualización se verificó un solo botón “Nueva recepción”, que cancelar la confirmación no cambia la inconsistencia, que confirmar la envía a cuarentena y que Historial muestra y conserva fecha, acción, bulto y motivo después de recargar. Los datos se restablecieron al terminar la prueba. No hubo errores de sintaxis JavaScript. No hay pruebas automatizadas de aceptación para las 30 HUs.
 
 ## Próximos pasos recomendados
 

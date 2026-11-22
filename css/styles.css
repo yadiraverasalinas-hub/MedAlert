@@ -328,9 +328,6 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
 .mode-switch{width:100%;min-height:40px;margin-top:12px;padding:0 10px;border:1px solid #c9dce4;border-radius:8px;background:#f4fafb;color:#0d5c75;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
 .mode-switch:hover{background:#e8f4f4}
 .mode-switch:focus-visible{outline:3px solid #43a9bb;outline-offset:2px}
-.sidebar-create{display:flex;align-items:center;justify-content:center;min-height:42px;margin-top:18px;padding:0 12px;border:0;border-radius:8px;background:#0d5c75;color:#fff;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
-.sidebar-create:hover{background:#08485e}
-.sidebar-create:focus-visible{outline:3px solid #43a9bb;outline-offset:2px}
 .consumer-shell{--consumer-scale:1;max-width:1080px;margin:0 auto;padding:clamp(18px,4vw,42px);color:#243247;font-size:calc(16px * var(--consumer-scale));line-height:1.55}
 .consumer-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
 .consumer-header h1{margin:2px 0 5px;color:#1c2a3c;font-size:clamp(1.7em,4vw,2.4em);line-height:1.15}
@@ -419,8 +416,6 @@ body.native-web .stage{background:var(--surface)}
 .nav-icon{width:24px;height:24px}
 .nav-icon .ui-icon{width:22px;height:22px}
 .nav-count{border-color:#f0c4c4;background:#fff2f2;color:#a53a3a}
-.sidebar-create{background:var(--action);font-size:14px}
-.sidebar-create:hover{background:#18745f}
 .mode-switch{border-color:#80c4b1;background:#e8f5f1;color:#176b58;font-size:14px}
 .mode-switch:hover{background:#d9eee7}
 .web-topbar{background:var(--surface)}
@@ -439,7 +434,7 @@ body.native-web .stage{background:var(--surface)}
 .button-danger{border-color:#a53a3a;background:#a53a3a;color:#fff}
 .button-danger:hover{border-color:#852d2d;background:#852d2d}
 .button-small{min-height:40px;font-size:14px}
-.button:focus-visible,.nav-link:focus-visible,.mode-switch:focus-visible,.sidebar-create:focus-visible{outline:3px solid #65c7ad;outline-offset:3px}
+.button:focus-visible,.nav-link:focus-visible,.mode-switch:focus-visible{outline:3px solid #65c7ad;outline-offset:3px}
 .stat-card,.report-panel,.workflow-card,.form-fieldset,.progress-card{background:#fff}
 .stat-label{font-size:14px}
 .stat-value{color:var(--structure);font-size:28px}
@@ -515,6 +510,17 @@ dialog#confirm-action{width:min(90vw,480px);padding:24px;border:1px solid #d5e0e
 #web-app.consumer-mode:not([hidden]){background:var(--surface)}
 .form-field>input:focus,.form-field>textarea:focus,.form-field>select:focus,.consumer-field>input:focus,.consumer-field>textarea:focus{outline:3px solid #1f8a7040;border-color:var(--action)}
 .consumer-highlight{border-left-color:var(--structure-light);background:#edf4f8}
+.status-flow{display:flex;align-items:flex-start;gap:10px;margin:-10px 0 24px;padding:12px 15px;border:1px solid #c9dce8;border-radius:9px;background:#edf4f8;color:var(--structure);font-size:14px;line-height:1.5}
+.status-flow>.ui-icon{flex:none;width:20px;height:20px}
+.row-actions{display:grid;justify-items:stretch;gap:6px;min-width:132px}
+.row-actions .button{width:100%;min-height:38px;padding-inline:8px;font-size:13px}
+.history-card .records-table{min-width:760px}
+.history-card .records-table td{vertical-align:top}
+.history-action strong{color:var(--structure)}
+.history-reason{min-width:230px;max-width:440px;line-height:1.45}
+@media(max-width:760px){
+  .status-flow{align-items:flex-start;font-size:13px}
+}
 @media(max-width:760px){
   .web-sidebar{background:var(--structure)}
   .nav-link{min-height:42px}
