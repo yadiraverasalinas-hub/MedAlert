@@ -787,6 +787,8 @@ window.MedAlertWeb = (() => {
           transcript.append(section);
         }
         ocrOutput.append(transcript);
+        const analysisPanel = window.MedAlertGemini.createAnalysisPanel(results);
+        if (analysisPanel) ocrOutput.append(analysisPanel);
         ocrOutput.append(catalogOutput);
         catalogEnabled = true;
         renderCatalog();
@@ -815,7 +817,7 @@ window.MedAlertWeb = (() => {
     actions.append(addAndContinue, addNext);
     form.append(actions);
     panel.append(form);
-    addLocalOnlyNotice(panel, 'Los datos se guardan en este navegador. Las fotos se procesan aquí y no se guardan ni se suben; revisa cada sugerencia manualmente. Esto no es una verificación sanitaria.');
+    addLocalOnlyNotice(panel, 'Los datos se guardan en este navegador. Las fotos se procesan aquí y no se guardan ni se suben; Gemini solo recibe la transcripción OCR si solicitas el análisis. Esto no es una verificación sanitaria.');
     const recordsHeading = element('div', 'section-heading');
     recordsHeading.append(element('h2', '', 'Bultos registrados'), element('span', '', `${records.length} en este dispositivo`));
     main.append(recordsHeading);

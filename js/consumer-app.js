@@ -59,7 +59,7 @@ window.MedAlertConsumer = (() => {
     return figure;
   }
 
-  function localNotice(text = 'Tesseract.js procesa el OCR en este dispositivo; las fotos no se suben. La primera vez se descargan la librería y sus modelos de idioma. No se conectan IA ni fuentes oficiales.') {
+  function localNotice(text = 'Tesseract.js procesa el OCR en este dispositivo; las fotos no se suben. Si solicitas el análisis Gemini, solo se envía la transcripción OCR. No se consultan fuentes oficiales.') {
     const note = element('p', 'consumer-notice', text);
     note.setAttribute('role', 'note');
     note.prepend(window.MedAlertWeb.icon('info'));
@@ -272,6 +272,8 @@ window.MedAlertConsumer = (() => {
         recognizedText.append(section);
       }
       app.append(recognizedText);
+      const analysisPanel = window.MedAlertGemini.createAnalysisPanel(state.ocrResults);
+      if (analysisPanel) app.append(analysisPanel);
     }
     const form = element('form', 'consumer-form');
     for (const [label, key, options] of [
