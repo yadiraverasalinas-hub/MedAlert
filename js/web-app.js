@@ -307,7 +307,7 @@ window.MedAlertWeb = (() => {
     confirm.focus();
   }
 
-  function quarantineRecord(record, reason = record.note) {
+  function quarantineRecord(record, reason, evidence) {
     if (record.status === 'En cuarentena') return false;
     if (!saveChange(() => {
       const at = new Date().toISOString();
@@ -319,25 +319,14 @@ window.MedAlertWeb = (() => {
         type: 'quarantine',
         label: 'Enviar a cuarentena',
         description: rationale,
+        evidence,
         createdAt: at
       });
-      logAction(record, 'Enviado a cuarentena', rationale, at);
+      logAction(record, 'Enviado a cuarentena', rationale + ' · Evidencia: ' + evidence, at);
     })) return false;
     render(currentId, navigate);
     announce('Lote separado para revisión.');
     return true;
-  }
-
-  function requestQuarantine(record) {
-    const reason = record.status === 'Inconsistencia'
-      ? record.note
-      : record.quarantineReason || record.note;
-    confirmSensitiveAction(
-      'Confirmar cuarentena',
-      `El bulto ${record.package} de ${record.product} se marcará en cuarentena y quedará fuera del inventario de este navegador. Motivo: ${reason || 'Separación para revisión manual.'}`,
-      'Mover a cuarentena',
-      () => quarantineRecord(record, reason)
-    );
   }
 
   function showDetails(record) {
@@ -383,7 +372,7 @@ window.MedAlertWeb = (() => {
     if (record.status !== 'En cuarentena') {
       body.append(button('Enviar a cuarentena', 'button button-secondary', () => {
         dialog.close();
-        requestQuarantine(record);
+        selectRecord(record, '41:414');
       }));
     }
     if (!dialog.open) dialog.showModal();
@@ -605,7 +594,7 @@ window.MedAlertWeb = (() => {
       const actions = element('div', 'row-actions');
       actions.append(button(record.status === 'Verificado local' ? 'Ver detalle' : 'Revisar lote', 'button button-small', () => showDetails(record)));
       if (record.status === 'Inconsistencia') {
-        const quarantine = button('Enviar a cuarentena', 'button button-small button-danger', () => requestQuarantine(record));
+        const quarantine = button('Enviar a cuarentena', 'button button-small button-danger', () => selectRecord(record, '41:414'));
         quarantine.prepend(icon('warning'));
         actions.append(quarantine);
       }
@@ -1320,7 +1309,7 @@ window.MedAlertWeb = (() => {
     const record = selectedRecord();
     const panel = addFormPanel(main, `Registrar acción · ${record.product}`, `Deja constancia de la medida adoptada para el lote ${record.lot || 'sin dato'}.`);
     const form = element('form', 'data-form');
-    const fields = addFieldset(form, 'Acción adoptada', 'La constancia quedará asociada a este producto y lote.');
+    const fields = addFieldset(form, '1. Elige la medida', 'La constancia quedará asociada a este producto y lote.');
     const label = element('label', 'form-field');
     label.append(element('span', '', 'Medida'));
     const select = element('select');
@@ -1334,10 +1323,18 @@ window.MedAlertWeb = (() => {
     ]) select.append(new Option(text, value));
     label.append(select);
     fields.append(label);
-    addFormField(fields, 'Detalle y responsable de seguimiento', 'description', '', { required: true, multiline: true, rows: 4, wide: true });
+    const details = addFieldset(form, '2. Registra el motivo y la evidencia', 'Describe qué observaste y dónde se puede verificar.');
+    addFormField(details, 'Motivo de la medida', 'description', record.status === 'Inconsistencia' ? record.note : '', { required: true, multiline: true, rows: 3, wide: true });
+    const evidenceField = addFormField(details, 'Evidencia observada o referencia', 'evidence', '', { multiline: true, rows: 3, wide: true, placeholder: 'Ej. Sello abierto en el reverso o referencia de la foto' });
+    function updateEvidence() {
+      evidenceField.required = select.value === 'quarantine';
+    }
+    select.addEventListener('change', updateEvidence);
+    updateEvidence();
+    const confirmation = addFieldset(form, '3. Revisa y confirma', 'La cuarentena excluye el bulto del inventario local.');
     const save = element('button', 'button button-primary', 'Guardar acción y generar constancia');
     save.type = 'submit';
-    form.append(save);
+    confirmation.append(save);
     form.addEventListener('submit', event => {
       event.preventDefault();
       const description = form.elements.description.value.trim();
@@ -1353,18 +1350,26 @@ window.MedAlertWeb = (() => {
         description,
         createdAt: new Date().toISOString()
       };
+      const evidence = evidenceField.value.trim();
       if (action.type === 'quarantine') {
+        if (!evidence) {
+          evidenceField.setCustomValidity('Describe o identifica la evidencia de la cuarentena.');
+          evidenceField.reportValidity();
+          evidenceField.setCustomValidity('');
+          return;
+        }
         confirmSensitiveAction(
           'Confirmar cuarentena',
-          `El bulto ${record.package} de ${record.product} se separará del inventario. Motivo: ${description}`,
-          'Confirmar y enviar',
+          `El bulto ${record.package} de ${record.product} se separará del inventario. Motivo: ${description}. Evidencia: ${evidence}`,
+          'Confirmar cuarentena',
           () => {
-            if (quarantineRecord(record, description)) navigate('41:679');
+            if (quarantineRecord(record, description, evidence)) navigate('41:679');
           }
         );
         return;
       }
       if (!saveChange(() => {
+        if (evidence) action.evidence = evidence;
         record.actions.push(action);
         record.note = `${action.label}: ${description}`;
         logAction(record, action.label, description, action.createdAt);
@@ -1377,7 +1382,7 @@ window.MedAlertWeb = (() => {
 
   function renderConstancy(main) {
     const record = selectedRecord();
-    const panel = addFormPanel(main, 'Constancia de revisión local', `${record.product} · ${record.lot || 'Lote sin dato'} · ${record.guide}`);
+    const panel = addFormPanel(main, 'Constancia local de demostración', `${record.product} · ${record.lot || 'Lote sin dato'} · ${record.guide}`);
     const latestAction = record.actions[record.actions.length - 1];
     const details = [
       ['Estado', record.status],
@@ -1396,13 +1401,14 @@ window.MedAlertWeb = (() => {
     if (latestAction) {
       const action = element('section', 'report-panel');
       action.append(element('h2', '', latestAction.label), element('p', '', latestAction.description), element('small', '', new Date(latestAction.createdAt).toLocaleString('es')));
+      if (latestAction.evidence) action.append(element('p', '', 'Evidencia: ' + latestAction.evidence));
       panel.append(action);
     } else {
       panel.append(element('p', 'form-help', 'Todavía no hay una acción registrada para este producto.'));
     }
     const print = button('Imprimir constancia', 'button button-secondary', () => {
       const lines = [
-        'MedAlert · Constancia de revisión local',
+        'MedAlert · Constancia local de demostración',
         `Producto: ${record.product}`,
         `Lote: ${record.lot || 'Sin dato'}`,
         `Guía: ${record.guide}`,
@@ -1411,6 +1417,7 @@ window.MedAlertWeb = (() => {
         latestAction ? `Acción: ${latestAction.label} — ${latestAction.description}` : 'Acción: no registrada',
         'Datos ingresados localmente; no es una consulta ni certificación oficial.'
       ];
+      if (latestAction?.evidence) lines.splice(-1, 0, 'Evidencia: ' + latestAction.evidence);
       document.querySelector('#print-report').textContent = lines.join('\n');
       window.print();
     });

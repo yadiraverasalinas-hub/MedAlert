@@ -120,8 +120,13 @@ window.MedAlertConsumer = (() => {
     file.type = 'file';
     file.setAttribute('aria-label', `Capturar ${label.toLowerCase()}`);
     openCapture(side, file);
-    card.append(file, button(state[side] ? 'Cambiar imagen' : 'Tomar o elegir foto', 'button button-primary', () => file.click()));
-    card.append(preview(state[side], label));
+    card.append(file, button(state[side] ? 'Repetir foto' : 'Tomar o elegir foto', 'button button-primary', () => file.click()));
+    if (state[side]) {
+      card.append(preview(state[side], label));
+    } else {
+      const guide = element('div', 'capture-frame', side === 'front' ? 'Encuadra el frente completo' : 'Encuadra el lote y el vencimiento');
+      card.append(guide);
+    }
     return card;
   }
 
@@ -141,7 +146,6 @@ window.MedAlertConsumer = (() => {
     root.replaceChildren();
     root.classList.add('consumer-mode');
     const app = element('main', 'consumer-shell');
-    app.style.setProperty('--consumer-scale', String(state.textScale));
     const header = element('header', 'consumer-header');
     const titleBlock = element('div');
     const logo = element('img', 'medalert-logo consumer-logo');
@@ -151,9 +155,17 @@ window.MedAlertConsumer = (() => {
     logo.height = 373;
     titleBlock.append(logo, element('div', 'consumer-eyebrow', 'Modo consumidor'), element('h1', '', title), element('p', '', description));
     const controls = element('div', 'consumer-controls');
+    const decrease = button('A−', 'button button-secondary', () => changeTextScale(-0.1));
+    const increase = button('A+', 'button button-secondary', () => changeTextScale(0.1));
+    decrease.setAttribute('aria-label', 'Disminuir tamaño del texto');
+    increase.setAttribute('aria-label', 'Aumentar tamaño del texto');
+    const scaleStatus = element('span', 'consumer-scale-status');
+    scaleStatus.setAttribute('role', 'status');
+    updateScale();
     controls.append(
-      button('A−', 'button button-secondary', () => changeTextScale(-0.1)),
-      button('A+', 'button button-secondary', () => changeTextScale(0.1)),
+      decrease,
+      increase,
+      scaleStatus,
       button('Volver a farmacia', 'button button-secondary', () => {
         state.ocrRunId++;
         returnToPharmacy();
@@ -163,11 +175,20 @@ window.MedAlertConsumer = (() => {
     app.append(header, stepper());
     root.append(app);
     return app;
-  }
 
-  function changeTextScale(amount) {
-    state.textScale = Math.min(1.5, Math.max(1, Math.round((state.textScale + amount) * 10) / 10));
-    render();
+    function changeTextScale(amount) {
+      const previous = state.textScale;
+      state.textScale = Math.min(1.5, Math.max(0.9, Math.round((state.textScale + amount) * 10) / 10));
+      if (state.textScale === previous) return;
+      updateScale();
+      scaleStatus.textContent = `Tamaño del texto: ${Math.round(state.textScale * 100)} %`;
+    }
+
+    function updateScale() {
+      app.style.setProperty('--consumer-scale', String(state.textScale));
+      decrease.setAttribute('aria-disabled', String(state.textScale === 0.9));
+      increase.setAttribute('aria-disabled', String(state.textScale === 1.5));
+    }
   }
 
   function updateOcrProgress(runId, progress) {
@@ -205,10 +226,8 @@ window.MedAlertConsumer = (() => {
       }
       const recognized = results.filter(result => result.text);
       state.ocrStatus = recognized.length ? 'complete' : 'empty';
-      const confidence = recognized.map(result => result.confidence).filter(Number.isFinite);
-      const confidenceNote = confidence.length ? ` Confianza global del texto: ${Math.round(confidence.reduce((sum, value) => sum + value, 0) / confidence.length)}%; no indica que cada campo sea correcto.` : '';
       state.ocrMessage = recognized.length
-        ? `Lectura terminada. Revisa y corrige cada sugerencia antes de continuar.${confidenceNote}`
+        ? 'Lectura terminada. Revisa y corrige cada sugerencia antes de continuar.'
         : 'No se encontró texto legible. Puedes continuar e ingresar los datos manualmente.';
       render();
     } catch (error) {
@@ -269,11 +288,11 @@ window.MedAlertConsumer = (() => {
     app.append(preview(state.front, 'Frente del empaque'), preview(state.back, 'Reverso del empaque'));
     if (state.ocrResults.length) {
       const recognizedText = element('details', 'consumer-ocr-results');
-      recognizedText.open = true;
-      recognizedText.append(element('summary', '', 'Transcripción OCR · texto reconocido en las fotos'));
+      recognizedText.append(element('summary', '', 'Texto de las fotos y calidad de lectura OCR'));
+      recognizedText.append(element('p', '', 'El porcentaje estima la calidad del reconocimiento de texto. La autenticidad y la seguridad requieren una verificación independiente.'));
       for (const result of state.ocrResults) {
         const section = element('section');
-        const confidence = Number.isFinite(result.confidence) ? ` · confianza global ${result.confidence}%` : '';
+        const confidence = Number.isFinite(result.confidence) ? ` · calidad estimada del texto ${result.confidence}%` : '';
         section.append(element('h3', '', `${result.label}${confidence}`), element('pre', '', result.text || 'No se detectó texto legible.'));
         recognizedText.append(section);
       }
@@ -294,6 +313,15 @@ window.MedAlertConsumer = (() => {
       ['Producto indicado en la receta (si corresponde)', 'indication', { wide: true }]
     ]) {
       const input = addField(form, label, key, state.data[key], options);
+      if (state.ocrResults.length && key !== 'indication' && !state.data[key]) {
+        const conflicting = state.ocrEvidence[key]?.length > 1;
+        const help = element('small', 'consumer-field-help', conflicting
+          ? 'Se leyeron valores distintos. Revisa el empaque y escribe el correcto.'
+          : 'Campo sin lectura clara. Escríbelo o repite la foto.');
+        help.id = 'ocr-help-' + key;
+        input.setAttribute('aria-describedby', help.id);
+        input.parentElement.append(help);
+      }
       input.addEventListener('input', () => {
         state.data[key] = input.value;
         state.dataSources[key] = 'manual';
@@ -386,7 +414,7 @@ window.MedAlertConsumer = (() => {
     };
     if (state.signals.length) return {
       title: 'Revisión necesaria',
-      description: 'Registraste señales visibles que requieren revisión presencial. No se puede confirmar la autenticidad con estas fotos.'
+      description: 'Registraste señales visibles en el empaque. Antes de usar el producto, consulta a tu farmacia y lleva el empaque para que lo revisen.'
     };
     return {
       title: 'Autenticidad no confirmada',
@@ -403,6 +431,7 @@ window.MedAlertConsumer = (() => {
     const summary = resultSummary();
     const card = element('section', 'consumer-result needs-review');
     card.append(window.MedAlertWeb.icon('warning'), element('span', 'consumer-eyebrow', 'Resultado local · Sin validación externa'), element('h2', '', summary.title), element('p', '', summary.description));
+    card.append(button('Consultar a mi farmacia', 'button button-primary', () => { state.step = 'support'; render(); }));
     app.append(card);
     if (state.signals.length) {
       const warning = element('p', 'consumer-warning');
@@ -458,8 +487,7 @@ window.MedAlertConsumer = (() => {
     app.append(support);
     const actions = element('div', 'consumer-actions');
     actions.append(
-      button('Editar datos', 'button button-secondary', () => { state.step = 'data'; render(); }),
-      button('Detener y ver opciones de consulta', 'button button-secondary', () => { state.step = 'support'; render(); })
+      button('Editar datos', 'button button-secondary', () => { state.step = 'data'; render(); })
     );
     const finish = button('Confirmé la revisión', 'button button-primary', () => {
       state.feedback = 'Confirmaste la lectura. Este resultado no confirma que el medicamento sea auténtico o seguro.';
@@ -476,7 +504,7 @@ window.MedAlertConsumer = (() => {
   }
 
   function renderSupport() {
-    const app = shell('Detener la verificación', 'No hace falta continuar si algo no se ve claro.');
+    const app = shell('Consultar a mi farmacia', 'Lleva el empaque y señala el dato o la señal que requiere revisión.');
     app.append(
       element('section', 'consumer-result needs-review'),
       localNotice('No podemos confirmar si un medicamento es auténtico o seguro. Consulta a un farmacéutico o profesional de salud. Si crees que existe una emergencia, contacta los servicios de emergencia de tu localidad.')

@@ -28,7 +28,16 @@ test('static server serves the app but not dotfiles or backend source', async ()
   await withServer(server, async baseUrl => {
     const app = await fetch(`${baseUrl}/`);
     assert.equal(app.status, 200);
-    assert.match(await app.text(), /MedAlert/);
+    const html = await app.text();
+    assert.match(html, /MedAlert/);
+    const iconPath = /rel="icon"[^>]*href="([^"]+)"/.exec(html)?.[1];
+    assert.ok(iconPath);
+    const icon = await fetch(new URL(iconPath, baseUrl));
+    assert.equal(icon.status, 200);
+    assert.equal(icon.headers.get('content-type'), 'image/x-icon');
+    const iconBytes = Buffer.from(await icon.arrayBuffer());
+    assert.equal(iconBytes.readUInt16LE(2), 1);
+    assert.equal(iconBytes.readUInt16LE(4), 3);
 
     for (const pathname of ['/.env', '/.env.example', '/server.js']) {
       const response = await fetch(`${baseUrl}${pathname}`);
