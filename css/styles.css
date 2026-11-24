@@ -39,9 +39,10 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
 #display[hidden]{display:none}
 #web-app[hidden]{display:none}
 #web-app:not([hidden]){display:grid;grid-template-columns:clamp(152px,16vw,248px) minmax(0,1fr);min-height:100%;color:#243247;background:#f5f8fb;font:14px/1.5 Inter,system-ui,sans-serif}
+.web-brand{display:block;align-self:flex-start;max-width:100%}
+.medalert-logo{display:block;width:240px;max-width:100%;height:auto}
+.medalert-logo.consumer-logo{margin-bottom:8px}
 .web-sidebar{position:sticky;top:0;display:flex;flex-direction:column;align-self:start;height:100dvh;min-height:620px;padding:24px 16px 18px;background:#fff;border-right:1px solid #e3eaf0}
-.web-brand{display:flex;align-items:center;gap:10px;padding:0 8px;color:#0d5c75;text-decoration:none;font-size:23px;font-weight:600;letter-spacing:-.04em}
-.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#0d5c75;color:#fff;font-size:23px;font-weight:400}
 .pharmacy-card{display:flex;flex-direction:column;gap:3px;margin:27px 4px 24px;padding:13px 10px;border:1px solid #edf1f5;border-radius:10px;background:#fbfcfd}
 .pharmacy-card strong{font-size:13px;color:#263548}
 .pharmacy-card span,.user-copy small{color:#718096;font-size:12px}
@@ -154,10 +155,6 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
 #web-screen-picker{display:none}
 .ui-icon{display:block;width:20px;height:20px}
 .web-sidebar{padding:22px 12px 18px}
-.web-brand{gap:7px;padding:0 1px;font-size:20px;letter-spacing:-.03em}
-.brand-mark{position:relative;width:28px;height:28px;border-radius:8px}
-.brand-mark .ui-icon{width:19px;height:19px}
-.brand-mark::after{position:absolute;inset:0;display:grid;place-items:center;content:'+';font-size:12px;font-weight:700}
 .pharmacy-card{gap:2px;margin:7px 0 0;padding:0;border:0;background:transparent}
 .pharmacy-card strong{font-size:12px}
 .pharmacy-card span{font-size:11px}
@@ -232,7 +229,6 @@ body.native-web .stage{overflow:auto;scrollbar-gutter:auto;background:#f5f8fb}
 @media(max-width:760px){
   #web-app:not([hidden]){display:flex;flex-direction:column}
   .web-sidebar{position:static;width:100%;min-width:0;height:auto;min-height:0;padding:12px 14px 8px;border-right:0;border-bottom:1px solid #e3eaf0}
-  .web-brand{font-size:20px}
   .pharmacy-card,.sidebar-note{display:none}
   .web-nav{display:flex;min-width:0;gap:4px;margin-top:12px;overflow-x:auto;padding-bottom:3px}
   .nav-link{flex:none;min-height:39px;padding:0 10px;gap:7px;font-size:12px}
@@ -447,8 +443,6 @@ body.native-web .stage{background:var(--surface)}
   font:16px/1.5 Inter,system-ui,sans-serif;
 }
 .web-sidebar{background:#fff;border-color:#e3eaf0}
-.web-brand{color:#0d5c75;font-size:18px;font-weight:600}
-.brand-mark{background:#0d5c75;color:#fff}
 .pharmacy-card strong{color:#263548;font-size:14px}
 .pharmacy-card span,.user-copy small{color:#718096;font-size:12px}
 .web-nav{gap:7px}

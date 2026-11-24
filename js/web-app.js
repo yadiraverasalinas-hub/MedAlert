@@ -395,9 +395,13 @@ window.MedAlertWeb = (() => {
     const sidebar = element('aside', 'web-sidebar');
     const brand = element('a', 'web-brand');
     brand.href = '#';
-    const mark = element('span', 'brand-mark');
-    mark.append(icon('shield'));
-    brand.append(mark, element('span', '', 'MedAlert'));
+    brand.setAttribute('aria-label', 'MedAlert · Menú principal');
+    const logo = element('img', 'medalert-logo');
+    logo.src = 'assets/images/medalert-logo.png';
+    logo.alt = '';
+    logo.width = 1280;
+    logo.height = 373;
+    brand.append(logo);
     brand.addEventListener('click', event => { event.preventDefault(); navigate('2:5027'); });
     sidebar.append(brand);
     const pharmacy = element('div', 'pharmacy-card');

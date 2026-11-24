@@ -144,7 +144,12 @@ window.MedAlertConsumer = (() => {
     app.style.setProperty('--consumer-scale', String(state.textScale));
     const header = element('header', 'consumer-header');
     const titleBlock = element('div');
-    titleBlock.append(element('div', 'consumer-eyebrow', 'MedAlert · Modo consumidor'), element('h1', '', title), element('p', '', description));
+    const logo = element('img', 'medalert-logo consumer-logo');
+    logo.src = 'assets/images/medalert-logo.png';
+    logo.alt = 'MedAlert';
+    logo.width = 1280;
+    logo.height = 373;
+    titleBlock.append(logo, element('div', 'consumer-eyebrow', 'Modo consumidor'), element('h1', '', title), element('p', '', description));
     const controls = element('div', 'consumer-controls');
     controls.append(
       button('A−', 'button button-secondary', () => changeTextScale(-0.1)),
