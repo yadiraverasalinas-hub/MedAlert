@@ -140,3 +140,30 @@ test('missing key returns a setup error without making an upstream request', asy
   });
   assert.equal(upstreamCalled, false);
 });
+
+test('Gemini has a per-instance request budget', async () => {
+  let forwarded = 0;
+  const server = createServer({
+    env: { GEMINI_API_KEY: 'test-only-secret' },
+    fetchImpl: async () => {
+      forwarded++;
+      return { ok: true, json: async () => ({ candidates: [] }) };
+    }
+  });
+  await withServer(server, async baseUrl => {
+    const send = () => fetch(`${baseUrl}/api/analyze-medicine`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: 'Texto de prueba' })
+    });
+    for (let index = 0; index < 10; index++) {
+      const response = await send();
+      assert.equal(response.status, 502);
+      await response.json();
+    }
+    const limited = await send();
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.headers.get('retry-after')) > 0);
+    assert.equal(forwarded, 10);
+  });
+});

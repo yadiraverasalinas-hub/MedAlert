@@ -59,7 +59,7 @@ window.MedAlertConsumer = (() => {
     return figure;
   }
 
-  function localNotice(text = 'Tesseract.js procesa el OCR en este dispositivo; las fotos no se suben. Si solicitas el análisis Gemini, solo se envía la transcripción OCR. No se consultan fuentes oficiales.') {
+  function localNotice(text = 'Tesseract.js procesa el OCR en este dispositivo; las fotos no se suben. Si solicitas el análisis, Gemini recibe la transcripción OCR y las comparaciones con el catálogo demo. No se consultan fuentes oficiales.') {
     const note = element('p', 'consumer-notice', text);
     note.setAttribute('role', 'note');
     note.prepend(window.MedAlertWeb.icon('info'));

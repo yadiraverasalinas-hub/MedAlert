@@ -13,7 +13,7 @@ La integración opcional analiza la transcripción OCR y las comparaciones de ha
 3. Agrega la clave nueva a `GEMINI_API_KEY` dentro de `.env`.
 4. Ejecuta `node --env-file=.env server.js` y abre `http://127.0.0.1:4173`.
 
-El servidor lee la clave solo desde el entorno, escucha en `127.0.0.1` por defecto y no guarda la transcripción. `.gitignore` excluye `.env`; `.env.example` solo contiene un marcador. GitHub Pages no ejecuta Node ni oculta secretos: para usar la función publicada se debe desplegar un backend independiente y protegerlo antes de conectar el sitio.
+El servidor lee la clave solo desde el entorno, escucha en `127.0.0.1` por defecto y no guarda la transcripción. `.gitignore` excluye `.env`; `.env.example` solo contiene un marcador. GitHub Pages no ejecuta Node ni oculta secretos: para usar la función publicada se debe desplegar un backend independiente y exigir autenticación en el servidor o proxy antes de conectar el sitio. El servidor local limita Gemini a dos análisis simultáneos y diez solicitudes por minuto por instancia.
 
 Las pruebas locales del backend se ejecutan con `node --test`. No requieren una clave real ni hacen llamadas a Gemini.
 

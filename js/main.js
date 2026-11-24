@@ -9,7 +9,7 @@ const svg = document.querySelector('#display');
 const layers = document.querySelector('#layers');
 const controls = [...document.querySelectorAll('[data-layout]')];
 const narrow = matchMedia('(max-width:720px)');
-const starts = {web:'37:292',celular:'2:4726'};
+const starts = {web:'2:5027',celular:'2:4726'};
 const trail = [];
 const scheduled = new Set();
 const variants = new Map();
@@ -69,7 +69,7 @@ function go(id, push=true, transition=null) {
       svg.animate([{opacity:0.65,transform:'translateX('+dx+'px)'},{opacity:1,transform:'none'}],{duration:Math.min(450,(transition[3]||0)*1000)});
     }
   };
-  if(window.MedAlertPages[id]) return draw();
+  if(page.kind==='web' || window.MedAlertPages[id]) return draw();
   const script=document.createElement('script'); script.src='design/'+id.replace(':','-')+'.js';
   script.onload=draw; script.onerror=()=>notice('No se pudo cargar la pantalla. Vuelve a seleccionarla.'); document.head.append(script);
 }

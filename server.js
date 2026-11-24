@@ -8,6 +8,9 @@ const ROOT = __dirname;
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TRANSCRIPT_LENGTH = 12000;
 const GEMINI_TIMEOUT_MS = 30000;
+const GEMINI_REQUEST_WINDOW_MS = 60000;
+const MAX_GEMINI_REQUESTS_PER_WINDOW = 10;
+const MAX_ACTIVE_GEMINI_REQUESTS = 2;
 const CONTENT_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -340,7 +343,7 @@ async function handleRequest(request, response, options) {
       throw new HttpError(413, 'La transcripción excede el límite de 12 000 caracteres.');
     }
     const catalogDifferences = normalizeCatalogDifferences(body.catalogDifferences);
-    const analysis = await analyzeTranscript(transcript, catalogDifferences, options.env, options.fetchImpl);
+    const analysis = await options.analyze(transcript, catalogDifferences, response);
     sendJson(response, 200, { analysis });
     return;
   }
@@ -378,9 +381,37 @@ async function handleRequest(request, response, options) {
 }
 
 function createServer(options = {}) {
+  const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const recentRequests = [];
+  let activeRequests = 0;
   const configuration = {
-    env: options.env || process.env,
-    fetchImpl: options.fetchImpl || globalThis.fetch
+    env,
+    async analyze(transcript, catalogDifferences, response) {
+      if (!env.GEMINI_API_KEY?.trim()) {
+        return analyzeTranscript(transcript, catalogDifferences, env, fetchImpl);
+      }
+
+      const now = Date.now();
+      while (recentRequests.length && now - recentRequests[0] >= GEMINI_REQUEST_WINDOW_MS) {
+        recentRequests.shift();
+      }
+      if (recentRequests.length >= MAX_GEMINI_REQUESTS_PER_WINDOW || activeRequests >= MAX_ACTIVE_GEMINI_REQUESTS) {
+        const retryAfter = recentRequests.length >= MAX_GEMINI_REQUESTS_PER_WINDOW
+          ? Math.ceil((recentRequests[0] + GEMINI_REQUEST_WINDOW_MS - now) / 1000)
+          : 5;
+        response.setHeader('Retry-After', String(retryAfter));
+        throw new HttpError(429, 'Hay demasiadas solicitudes de análisis. Vuelve a intentarlo en unos segundos.');
+      }
+
+      recentRequests.push(now);
+      activeRequests++;
+      try {
+        return await analyzeTranscript(transcript, catalogDifferences, env, fetchImpl);
+      } finally {
+        activeRequests--;
+      }
+    }
   };
   return http.createServer((request, response) => {
     void handleRequest(request, response, configuration).catch(error => {

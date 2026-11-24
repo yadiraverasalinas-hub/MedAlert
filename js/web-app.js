@@ -81,6 +81,23 @@ window.MedAlertWeb = (() => {
   const actionHistory = Array.isArray(savedState?.actionHistory)
     ? savedState.actionHistory.filter(entry => entry && typeof entry === 'object').map(normalizeHistoryEntry)
     : [];
+  const holdEvents = new Map();
+  for (const entry of actionHistory) {
+    if (!holdEvents.has(entry.recordId)
+      && ['Enviado a cuarentena', 'Marcado como observado', 'Bulto liberado'].includes(entry.action)) {
+      holdEvents.set(entry.recordId, entry);
+    }
+  }
+  for (const record of records) {
+    const entry = holdEvents.get(record.id);
+    if (entry?.action === 'Enviado a cuarentena') {
+      record.status = 'En cuarentena';
+      record.quarantineReason = entry.reason;
+    } else if (entry?.action === 'Marcado como observado' && record.status !== 'En cuarentena') {
+      record.status = 'Observado';
+      record.note = entry.reason;
+    }
+  }
   let selectedRecordId = records.some(record => record.id === savedState?.selectedRecordId)
     ? savedState.selectedRecordId
     : records[0]?.id;
@@ -137,6 +154,22 @@ window.MedAlertWeb = (() => {
     if (text !== undefined) node.textContent = text;
     return node;
   };
+  function saveChange(change) {
+    const previousRecords = records.slice();
+    const snapshots = previousRecords.map(record => structuredClone(record));
+    const previousHistory = actionHistory.slice();
+    const previousSelection = selectedRecordId;
+    change();
+    if (persistState()) return true;
+    previousRecords.forEach((record, index) => {
+      for (const key of Object.keys(record)) delete record[key];
+      Object.assign(record, snapshots[index]);
+    });
+    records.splice(0, records.length, ...previousRecords);
+    actionHistory.splice(0, actionHistory.length, ...previousHistory);
+    selectedRecordId = previousSelection;
+    return false;
+  }
   function persistState() {
     try {
       localStorage.setItem(storageKey, JSON.stringify({ records, selectedRecordId, actionHistory }));
@@ -169,7 +202,7 @@ window.MedAlertWeb = (() => {
     navigate(destination);
   }
   function recordNeedsReview(record) {
-    return !['Verificado local', 'Verificado'].includes(record.status);
+    return record.status !== 'Verificado local' || inventoryBlockers(record).length > 0;
   }
   function quarantineCount() {
     return records.filter(record => ['Observado', 'En cuarentena'].includes(record.status)).length;
@@ -275,22 +308,24 @@ window.MedAlertWeb = (() => {
   }
 
   function quarantineRecord(record, reason = record.note) {
-    if (record.status === 'En cuarentena') return;
-    const at = new Date().toISOString();
-    const rationale = reason?.trim() || 'Separado para revisión manual.';
-    record.status = 'En cuarentena';
-    record.quarantineReason = rationale;
-    record.note = 'En cuarentena; pendiente de revisión manual.';
-    record.actions.push({
-      type: 'quarantine',
-      label: 'Enviar a cuarentena',
-      description: rationale,
-      createdAt: at
-    });
-    logAction(record, 'Enviado a cuarentena', rationale, at);
-    persistState();
+    if (record.status === 'En cuarentena') return false;
+    if (!saveChange(() => {
+      const at = new Date().toISOString();
+      const rationale = reason?.trim() || 'Separado para revisión manual.';
+      record.status = 'En cuarentena';
+      record.quarantineReason = rationale;
+      record.note = 'En cuarentena; pendiente de revisión manual.';
+      record.actions.push({
+        type: 'quarantine',
+        label: 'Enviar a cuarentena',
+        description: rationale,
+        createdAt: at
+      });
+      logAction(record, 'Enviado a cuarentena', rationale, at);
+    })) return false;
     render(currentId, navigate);
     announce('Lote separado para revisión.');
+    return true;
   }
 
   function requestQuarantine(record) {
@@ -430,11 +465,12 @@ window.MedAlertWeb = (() => {
           announce('Completa las seis comprobaciones antes de continuar.');
           return;
         }
-        if (!record.checklistCompletedAt) {
-          record.checklistCompletedAt = new Date().toISOString();
-          logAction(record, 'Checklist completado', 'Se completaron las seis comprobaciones de recepción.', record.checklistCompletedAt);
-        }
-        persistState();
+        if (!saveChange(() => {
+          if (!record.checklistCompletedAt) {
+            record.checklistCompletedAt = new Date().toISOString();
+            logAction(record, 'Checklist completado', 'Se completaron las seis comprobaciones de recepción.', record.checklistCompletedAt);
+          }
+        })) return;
         navigate('37:435');
       });
       next.id = 'continue-checklist';
@@ -460,7 +496,7 @@ window.MedAlertWeb = (() => {
     wrap.setAttribute('aria-label', 'Resumen de recepción');
     const stats = [
       ['Bultos registrados', String(records.length), 'Datos de ejemplo y locales', 'blue'],
-      ['Revisión local completa', String(records.filter(item => item.status === 'Verificado local').length), 'Sin consulta oficial', 'green'],
+      ['Revisión local completa', String(records.filter(item => !recordNeedsReview(item)).length), 'Sin consulta oficial', 'green'],
       ['Requieren revisión', String(records.filter(recordNeedsReview).length), 'No ingresar al inventario', 'amber']
     ];
     for (const [title, value, caption, color] of stats) {
@@ -605,8 +641,13 @@ window.MedAlertWeb = (() => {
     const headers = isHistory
       ? ['Fecha y hora', 'Acción', 'Bulto', 'Producto', 'Guía', 'Motivo']
       : ['Guía', 'Bulto', 'Producto', 'Lote', 'Vencimiento', 'Cantidad', 'Estado'];
+    const escapeCell = value => {
+      const text = String(value);
+      const safe = /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/.test(text) ? "'" + text : text;
+      return '"' + safe.replaceAll('"', '""') + '"';
+    };
     const csv = [headers, ...rows]
-      .map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+      .map(row => row.map(escapeCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
     const link = element('a');
     link.href = url;
@@ -685,6 +726,7 @@ window.MedAlertWeb = (() => {
     addFormField(packageFields, 'Registro sanitario impreso', 'registration', '', { required: true });
     const documentFields = addFieldset(form, 'Datos según la guía', 'Se usarán para comparar manualmente los datos de recepción.');
     addFormField(documentFields, 'Producto en la guía', 'documentProduct', '', { required: true });
+    addFormField(documentFields, 'Presentación en la guía', 'documentPresentation', '', { required: true });
     addFormField(documentFields, 'Lote en la guía', 'documentLot', '', { required: true });
     addFormField(documentFields, 'Vencimiento en la guía (MM/AAAA)', 'documentExpiry', '', { required: true, pattern: '(0[1-9]|1[0-2])\\/([0-9]{4})', placeholder: 'MM/AAAA' });
     addFormField(documentFields, 'Fabricante en la guía', 'documentManufacturer', '', { required: true });
@@ -817,7 +859,7 @@ window.MedAlertWeb = (() => {
     actions.append(addAndContinue, addNext);
     form.append(actions);
     panel.append(form);
-    addLocalOnlyNotice(panel, 'Los datos se guardan en este navegador. Las fotos se procesan aquí y no se guardan ni se suben; Gemini solo recibe la transcripción OCR si solicitas el análisis. Esto no es una verificación sanitaria.');
+    addLocalOnlyNotice(panel, 'Los datos se guardan en este navegador. Las fotos se procesan aquí y no se guardan ni se suben; Si solicitas el análisis, Gemini recibe la transcripción OCR y las comparaciones con el catálogo demo. Esto no es una verificación sanitaria.');
     const recordsHeading = element('div', 'section-heading');
     recordsHeading.append(element('h2', '', 'Bultos registrados'), element('span', '', `${records.length} en este dispositivo`));
     main.append(recordsHeading);
@@ -830,10 +872,19 @@ window.MedAlertWeb = (() => {
       event.preventDefault();
       if (!form.reportValidity()) return;
       const data = Object.fromEntries(new FormData(form).entries());
-      const sameGuideCount = records.filter(record => record.guide === data.guide).length + 1;
+      const guide = data.guide.trim();
+      if (!guide) {
+        announce('Ingresa el número de guía.');
+        return;
+      }
+      const sameGuideCount = records.reduce((highest, record) => {
+        if (record.guide.trim() !== guide) return highest;
+        const number = /^Bulto (\d+)$/.exec(record.package);
+        return number ? Math.max(highest, Number(number[1])) : highest;
+      }, 0) + 1;
       const record = normalizeRecord({
         id: makeId(),
-        guide: data.guide.trim(),
+        guide,
         package: `Bulto ${String(sameGuideCount).padStart(2, '0')}`,
         supplier: data.supplier.trim(),
         product: data.product.trim(),
@@ -845,6 +896,7 @@ window.MedAlertWeb = (() => {
         quantity: data.quantity.trim(),
         document: {
           product: data.documentProduct.trim(),
+          presentation: data.documentPresentation.trim(),
           lot: data.documentLot.trim(),
           expiry: data.documentExpiry.trim(),
           manufacturer: data.documentManufacturer.trim(),
@@ -858,10 +910,11 @@ window.MedAlertWeb = (() => {
         actions: [],
         createdAt: new Date().toISOString()
       }, records.length);
-      records.unshift(record);
-      selectedRecordId = record.id;
-      logAction(record, 'Bulto recibido', 'Registro manual de recepción.', record.createdAt);
-      persistState();
+      if (!saveChange(() => {
+        records.unshift(record);
+        selectedRecordId = record.id;
+        logAction(record, 'Bulto recibido', 'Registro manual de recepción.', record.createdAt);
+      })) return;
       if (event.submitter?.value === 'next') {
         announce(`${record.package} guardado localmente. Puedes registrar el siguiente bulto.`);
         render(currentId, navigate);
@@ -880,6 +933,8 @@ window.MedAlertWeb = (() => {
       const row = element('label', `check-row${check.done ? ' is-done' : ''}`);
       const input = element('input', 'check-input');
       input.type = 'checkbox';
+      input.name = 'receptionCheck';
+      input.value = check.id;
       input.checked = check.done;
       input.setAttribute('aria-label', check.title);
       const mark = element('span', 'check-mark');
@@ -891,19 +946,30 @@ window.MedAlertWeb = (() => {
       state.append(icon(check.done ? 'check' : 'info'), element('span', '', check.done ? 'Hecha' : 'Pendiente'));
       row.append(input, mark, copy, state);
       input.addEventListener('change', () => {
-        check.done = input.checked;
+        if (!saveChange(() => {
+          check.done = input.checked;
+          if (!check.done) {
+            delete record.checklistCompletedAt;
+            if (record.status === 'Verificado local') {
+              record.status = 'En revisión';
+              record.note = 'Checklist modificado; requiere nueva revisión.';
+              logAction(record, 'Checklist reabierto', record.note);
+            }
+          } else if (record.checks.every(item => item.done) && !record.checklistCompletedAt) {
+            record.checklistCompletedAt = new Date().toISOString();
+            logAction(record, 'Checklist completado', 'Se completaron las seis comprobaciones de recepción.', record.checklistCompletedAt);
+          }
+        })) {
+          render(currentId, navigate);
+          const replacement = [...document.querySelectorAll('input[name="receptionCheck"]')]
+            .find(item => item.value === check.id);
+          replacement?.focus();
+          announce('No se pudo guardar el checklist. Vuelve a intentarlo.');
+          return;
+        }
         row.classList.toggle('is-done', check.done);
         state.classList.toggle('is-done', check.done);
         state.replaceChildren(icon(check.done ? 'check' : 'info'), element('span', '', check.done ? 'Hecha' : 'Pendiente'));
-        if (!check.done && record.status === 'Verificado local') {
-          record.status = 'En revisión';
-          record.note = 'Checklist modificado; requiere nueva revisión.';
-        }
-        if (record.checks.every(item => item.done) && !record.checklistCompletedAt) {
-          record.checklistCompletedAt = new Date().toISOString();
-          logAction(record, 'Checklist completado', 'Se completaron las seis comprobaciones de recepción.', record.checklistCompletedAt);
-        }
-        persistState();
         updateProgress();
       });
       list.append(row);
@@ -972,6 +1038,29 @@ window.MedAlertWeb = (() => {
     return { rows, requiredMissing, mismatches };
   }
 
+  function isHeld(record) {
+    return ['Observado', 'En cuarentena'].includes(record.status);
+  }
+
+  const expiryPattern = /^(0[1-9]|1[0-2])\/(\d{4})$/;
+  function isExpired(value, today = new Date()) {
+    const match = expiryPattern.exec(value || '');
+    if (!match) return false;
+    const expiryMonth = Number(match[2]) * 12 + Number(match[1]) - 1;
+    return expiryMonth < today.getFullYear() * 12 + today.getMonth();
+  }
+
+  function inventoryBlockers(record) {
+    const comparison = compareRecord(record);
+    const reasons = comparison.mismatches.map(row => 'Diferencia en ' + row.label.toLowerCase());
+    if (comparison.requiredMissing) reasons.push('Faltan datos en empaque o guía');
+    if (!expiryPattern.test(record.expiry || '')) reasons.push('Falta una fecha de vencimiento válida');
+    else if (isExpired(record.expiry)) reasons.push('El bulto está vencido');
+    if (record.inspection.length) reasons.push('La inspección registra señales del empaque');
+    if (record.checks.some(check => !check.done)) reasons.push('El checklist está incompleto');
+    return reasons;
+  }
+
   function renderComparison(main) {
     const record = selectedRecord();
     const panel = addFormPanel(main, `Contraste · ${record.product}`, 'Compara manualmente los datos del empaque con la documentación de recepción.');
@@ -1019,39 +1108,66 @@ window.MedAlertWeb = (() => {
       event.preventDefault();
       if (!form.reportValidity()) return;
       const data = Object.fromEntries(new FormData(form).entries());
-      record.document = { ...record.document, ...data };
-      record.comparisonAt = new Date().toISOString();
-      logAction(record, record.status === 'Inconsistencia' ? 'Contraste: inconsistencia' : 'Contraste completado', record.note, record.comparisonAt);
-      persistState();
-      announce('Datos de guía guardados en este dispositivo.');
+      for (const key of Object.keys(data)) data[key] = data[key].trim();
+      if (Object.keys(data).every(key => data[key] === record.document[key])) return;
+      if (!saveChange(() => {
+        record.document = { ...record.document, ...data };
+        delete record.comparisonAt;
+        if (record.status === 'Verificado local') {
+          record.status = 'En revisión';
+          record.note = 'La guía cambió; requiere un nuevo contraste.';
+        }
+        logAction(record, 'Datos de guía modificados', 'Se requiere un nuevo contraste.');
+      })) return;
       render(currentId, navigate);
+      announce('Datos de guía guardados. Vuelve a ejecutar el contraste.');
     });
     panel.append(form);
-    const confirm = button('Guardar contraste y clasificar', 'button button-primary', () => {
-      const checksComplete = record.checks.every(check => check.done);
-      const comparison = compareRecord(record);
-      if (!checksComplete) {
-        announce('Completa primero las seis comprobaciones de recepción.');
+
+    function classify(releaseReason = '') {
+      const blockers = inventoryBlockers(record);
+      if (isHeld(record) && !releaseReason) return;
+      if (releaseReason && blockers.length) {
+        announce(blockers.join('. ') + '.');
         return;
       }
-      if (comparison.requiredMissing || comparison.mismatches.length) {
-        record.status = 'Inconsistencia';
-        const reasons = comparison.mismatches.map(row => row.label);
-        if (comparison.requiredMissing) reasons.push('faltan datos en empaque o guía');
-        record.note = `Diferencias o datos incompletos: ${reasons.join(', ')}.`;
-      } else {
-        record.status = 'Verificado local';
-        record.note = 'Coincidencia manual con la guía; sin consulta a fuentes oficiales.';
-      }
-      record.comparisonAt = new Date().toISOString();
-      persistState();
-      announce(record.status === 'Verificado local'
-        ? 'Contraste manual completo. No se consultaron fuentes oficiales.'
-        : 'Se encontraron diferencias o datos incompletos. El bulto no pasa al inventario.');
+      if (!saveChange(() => {
+        record.status = blockers.length ? 'Inconsistencia' : 'Verificado local';
+        record.note = blockers.length
+          ? blockers.join('. ') + '.'
+          : 'Coincidencia manual con la guía; sin consulta a fuentes oficiales.';
+        record.comparisonAt = new Date().toISOString();
+        const action = releaseReason
+          ? 'Bulto liberado'
+          : blockers.length ? 'Contraste: inconsistencia' : 'Contraste completado';
+        logAction(record, action, releaseReason || record.note, record.comparisonAt);
+      })) return;
       render(currentId, navigate);
-    });
-    confirm.disabled = !record.checks.every(check => check.done);
-    panel.append(confirm, button('Registrar inspección', 'button button-secondary', () => selectRecord(record, '37:579')));
+      announce(record.note);
+    }
+
+    if (isHeld(record)) {
+      const releaseForm = element('form', 'data-form');
+      addFormField(releaseForm, 'Motivo de liberación', 'reason', '', { required: true });
+      const release = element('button', 'button button-secondary', 'Liberar bulto y registrar contraste');
+      release.type = 'submit';
+      releaseForm.append(release);
+      releaseForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const reason = releaseForm.elements.reason.value.trim();
+        if (!reason) {
+          announce('Escribe el motivo de liberación.');
+          return;
+        }
+        classify(reason);
+      });
+      panel.append(releaseForm);
+    } else {
+      const confirm = button('Guardar contraste y clasificar', 'button button-primary', () => classify());
+      confirm.disabled = record.checks.some(check => !check.done);
+      panel.append(confirm);
+    }
+    panel.append(button('Registrar inspección', 'button button-secondary', () => selectRecord(record, '37:579')));
     addLocalOnlyNotice(panel, 'Este contraste es manual y solo compara empaque con guía. No verifica la autenticidad del registro sanitario ni consulta fuentes oficiales.');
   }
 
@@ -1083,15 +1199,16 @@ window.MedAlertWeb = (() => {
     form.append(save);
     form.addEventListener('submit', event => {
       event.preventDefault();
-      record.inspection = [...form.querySelectorAll('input[name="inspection"]:checked')].map(input => input.value);
-      record.inspectionNote = form.elements.inspectionNote.value.trim();
-      record.inspectionAt = new Date().toISOString();
-      if (record.inspection.length) {
-        record.status = 'Inconsistencia';
-        record.note = `Señales del empaque: ${record.inspection.join(', ')}.`;
-      }
-      logAction(record, 'Inspección registrada', record.inspection.length ? record.note : 'Inspección manual; no se registraron señales.', record.inspectionAt);
-      persistState();
+      if (!saveChange(() => {
+        record.inspection = [...form.querySelectorAll('input[name="inspection"]:checked')].map(input => input.value);
+        record.inspectionNote = form.elements.inspectionNote.value.trim();
+        record.inspectionAt = new Date().toISOString();
+        if (record.inspection.length && !isHeld(record)) {
+          record.status = 'Inconsistencia';
+          record.note = `Señales del empaque: ${record.inspection.join(', ')}.`;
+        }
+        logAction(record, 'Inspección registrada', record.inspection.length ? record.note : 'Inspección manual; no se registraron señales.', record.inspectionAt);
+      })) return;
       announce('Inspección guardada localmente.');
       render(currentId, navigate);
     });
@@ -1100,25 +1217,12 @@ window.MedAlertWeb = (() => {
   }
 
   function getRisk(record) {
-    const comparison = compareRecord(record);
-    const factors = [];
-    if (comparison.mismatches.length) factors.push(`Diferencias en: ${comparison.mismatches.map(row => row.label.toLowerCase()).join(', ')}.`);
-    if (record.inspection.length) factors.push(`Señales de empaque: ${record.inspection.join(', ')}.`);
-    const expiryMatch = /^(\d{2})\/(\d{4})$/.exec(record.expiry || '');
-    if (expiryMatch) {
-      const expiryDate = new Date(Number(expiryMatch[2]), Number(expiryMatch[1]), 0);
-      const today = new Date();
-      if (expiryDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) factors.push('La fecha de vencimiento ya pasó.');
-    }
-    if (['Observado', 'En cuarentena', 'Inconsistencia'].includes(record.status)) factors.push(record.note || `Estado: ${record.status}.`);
-    const missing = ['product', 'lot'].some(key => !record[key]?.trim() || !record.document[key]?.trim());
-    const incompleteChecklist = record.checks.some(check => !check.done);
-    if (missing) factors.push('Faltan datos de producto o lote para completar el contraste.');
-    if (incompleteChecklist) factors.push('El checklist de recepción está incompleto.');
-    const high = comparison.mismatches.length > 0 || record.inspection.length > 0
-      || factors.some(factor => factor.includes('vencimiento ya pasó'))
-      || ['Observado', 'En cuarentena', 'Inconsistencia'].includes(record.status);
-    const level = high ? 'Alto' : missing || incompleteChecklist ? 'Medio' : 'Bajo';
+    const factors = inventoryBlockers(record);
+    const high = compareRecord(record).mismatches.length > 0 || record.inspection.length > 0
+      || isExpired(record.expiry)
+      || isHeld(record) || record.status === 'Inconsistencia';
+    if (isHeld(record) || record.status === 'Inconsistencia') factors.push(record.note || record.status);
+    const level = high ? 'Alto' : factors.length ? 'Medio' : 'Bajo';
     return { level, factors, source: 'Reglas locales de demostración' };
   }
 
@@ -1150,9 +1254,10 @@ window.MedAlertWeb = (() => {
       event.preventDefault();
       if (!alertForm.reportValidity()) return;
       const data = Object.fromEntries(new FormData(alertForm).entries());
-      record.alerts.push({ title: data.title.trim(), description: data.description.trim(), createdAt: new Date().toISOString() });
-      logAction(record, 'Alerta interna registrada', `${data.title.trim()}: ${data.description.trim()}`);
-      persistState();
+      if (!saveChange(() => {
+        record.alerts.push({ title: data.title.trim(), description: data.description.trim(), createdAt: new Date().toISOString() });
+        logAction(record, 'Alerta interna registrada', `${data.title.trim()}: ${data.description.trim()}`);
+      })) return;
       announce('Alerta interna guardada; no fue enviada a ninguna autoridad.');
       render(currentId, navigate);
     });
@@ -1179,12 +1284,17 @@ window.MedAlertWeb = (() => {
         form.elements.reason.setCustomValidity('');
         return;
       }
-      record.status = 'Observado';
-      record.observedNote = reason;
-      record.note = reason;
-      record.observedAt = new Date().toISOString();
-      logAction(record, 'Marcado como observado', reason, record.observedAt);
-      persistState();
+      if (record.status === 'En cuarentena') {
+        announce('El bulto sigue en cuarentena. Registra la nota desde el formulario de acciones.');
+        return;
+      }
+      if (!saveChange(() => {
+        record.status = 'Observado';
+        record.observedNote = reason;
+        record.note = reason;
+        record.observedAt = new Date().toISOString();
+        logAction(record, 'Marcado como observado', reason, record.observedAt);
+      })) return;
       announce('Producto observado y excluido del inventario local.');
       navigate('41:414');
     });
@@ -1235,16 +1345,16 @@ window.MedAlertWeb = (() => {
           `El bulto ${record.package} de ${record.product} se separará del inventario. Motivo: ${description}`,
           'Confirmar y enviar',
           () => {
-            quarantineRecord(record, description);
-            navigate('41:679');
+            if (quarantineRecord(record, description)) navigate('41:679');
           }
         );
         return;
       }
-      record.actions.push(action);
-      record.note = `${action.label}: ${description}`;
-      logAction(record, action.label, description, action.createdAt);
-      persistState();
+      if (!saveChange(() => {
+        record.actions.push(action);
+        record.note = `${action.label}: ${description}`;
+        logAction(record, action.label, description, action.createdAt);
+      })) return;
       navigate('41:679');
     });
     panel.append(form);
@@ -1342,7 +1452,7 @@ window.MedAlertWeb = (() => {
       renderActionHistory(main);
     } else if (id === '50:166' || id === '50:582') {
       let rows = records;
-      if (id === '50:166') rows = records.filter(record => record.status === 'Verificado local');
+      if (id === '50:166') rows = records.filter(record => !recordNeedsReview(record));
       if (id === '50:582') rows = records.filter(record => ['Observado', 'En cuarentena'].includes(record.status));
       const section = element('div', 'section-heading');
       section.append(element('h2', '', id === '50:582' ? 'Productos observados o en cuarentena' : 'Lotes con revisión local completa'), element('span', '', `${rows.length} registros`));
