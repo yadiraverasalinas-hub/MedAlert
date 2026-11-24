@@ -10,7 +10,7 @@ window.MedAlertConsumer = (() => {
     ocrStatus: 'idle',
     ocrMessage: '',
     ocrResults: [],
-    ocrCandidates: {},
+    ocrEvidence: {},
     ocrRunId: 0,
     signals: [],
     signalNote: '',
@@ -102,7 +102,7 @@ window.MedAlertConsumer = (() => {
       state.ocrStatus = 'idle';
       state.ocrMessage = '';
       state.ocrResults = [];
-      state.ocrCandidates = {};
+      state.ocrEvidence = {};
       state.data = {};
       state.dataSources = {};
       state.captureConfirmed = false;
@@ -179,6 +179,7 @@ window.MedAlertConsumer = (() => {
     state.ocrStatus = 'working';
     state.ocrMessage = 'Preparando OCR local…';
     state.ocrResults = [];
+    state.ocrEvidence = {};
     state.feedback = '';
     render();
     const images = [
@@ -189,13 +190,13 @@ window.MedAlertConsumer = (() => {
       const results = await window.MedAlertOCR.recognizeImages(images, progress => updateOcrProgress(runId, progress));
       if (runId !== state.ocrRunId) return;
       state.ocrResults = results;
-      state.ocrCandidates = window.MedAlertOCR.extractCandidates(results);
+      const candidates = window.MedAlertOCR.extractCandidates(results, state.ocrEvidence);
       state.data = { ...state.data };
-      for (const [key, value] of Object.entries(state.ocrCandidates)) {
-        if (value && !state.data[key]) {
-          state.data[key] = value;
-          state.dataSources[key] = 'ocr';
-        }
+      for (const [key, value] of Object.entries(candidates)) {
+        if (state.dataSources[key] === 'manual') continue;
+        state.data[key] = value;
+        if (value) state.dataSources[key] = 'ocr';
+        else delete state.dataSources[key];
       }
       const recognized = results.filter(result => result.text);
       state.ocrStatus = recognized.length ? 'complete' : 'empty';
@@ -272,6 +273,8 @@ window.MedAlertConsumer = (() => {
         recognizedText.append(section);
       }
       app.append(recognizedText);
+      const evidence = window.MedAlertOCR.renderFieldEvidence(state.ocrEvidence);
+      if (evidence) app.append(evidence);
       const analysisPanel = window.MedAlertGemini.createAnalysisPanel(state.ocrResults);
       if (analysisPanel) app.append(analysisPanel);
     }
@@ -287,6 +290,7 @@ window.MedAlertConsumer = (() => {
     ]) {
       const input = addField(form, label, key, state.data[key], options);
       input.addEventListener('input', () => {
+        state.data[key] = input.value;
         state.dataSources[key] = 'manual';
         updateCatalog();
       });
@@ -482,7 +486,7 @@ window.MedAlertConsumer = (() => {
         state.ocrStatus = 'idle';
         state.ocrMessage = '';
         state.ocrResults = [];
-        state.ocrCandidates = {};
+        state.ocrEvidence = {};
         state.captureConfirmed = false;
         state.data = {};
         state.dataSources = {};
@@ -515,7 +519,7 @@ window.MedAlertConsumer = (() => {
     state.ocrStatus = 'idle';
     state.ocrMessage = '';
     state.ocrResults = [];
-    state.ocrCandidates = {};
+    state.ocrEvidence = {};
     state.captureConfirmed = false;
     state.data = {};
     state.dataSources = {};

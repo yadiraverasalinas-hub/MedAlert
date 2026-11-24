@@ -761,15 +761,17 @@ window.MedAlertWeb = (() => {
         ocrOutput.replaceChildren();
         for (const name of Object.values(candidateFields)) {
           const field = form.elements[name];
-          if (field.dataset.ocrSuggestion === 'true') field.value = '';
-          field.dataset.ocrSuggestion = 'false';
+          if (field.dataset.ocrSuggestion === 'true') {
+            field.value = '';
+            delete field.dataset.ocrSuggestion;
+          }
         }
         ocrStatus.textContent = 'Foto modificada. Ejecuta el OCR de nuevo y revisa todas las sugerencias.';
       });
     }
     for (const name of Object.values(candidateFields)) {
       form.elements[name].addEventListener('input', event => {
-        event.currentTarget.dataset.ocrSuggestion = 'false';
+        event.currentTarget.dataset.ocrSuggestion = 'manual';
         renderCatalog();
       });
     }
@@ -801,12 +803,15 @@ window.MedAlertWeb = (() => {
             ? `Leyendo ${progress.label}… ${Math.round(progress.progress * 100)}%`
             : `Preparando OCR local para ${progress.label.toLocaleLowerCase('es')}…`;
         });
-        const candidates = window.MedAlertOCR.extractCandidates(results);
         if (runId !== quickOcrRunId) return;
+        const fieldEvidence = {};
+        const candidates = window.MedAlertOCR.extractCandidates(results, fieldEvidence);
         for (const name of Object.values(candidateFields)) {
           const input = form.elements[name];
-          if (input.dataset.ocrSuggestion === 'true') input.value = '';
-          input.dataset.ocrSuggestion = 'false';
+          if (input.dataset.ocrSuggestion === 'true') {
+            input.value = '';
+            delete input.dataset.ocrSuggestion;
+          }
         }
         for (const [candidateName, candidateValue] of Object.entries(candidates)) {
           const name = candidateFields[candidateName];
@@ -814,7 +819,7 @@ window.MedAlertWeb = (() => {
           const value = candidateName === 'expiry' && /^\d{4}-\d{2}$/.test(candidateValue)
             ? candidateValue.replace(/^(\d{4})-(\d{2})$/, '$2/$1')
             : candidateValue;
-          if (value && !input.value.trim()) {
+          if (value && input.dataset.ocrSuggestion !== 'manual' && !input.value.trim()) {
             input.value = value;
             input.dataset.ocrSuggestion = 'true';
           }
@@ -829,6 +834,8 @@ window.MedAlertWeb = (() => {
           transcript.append(section);
         }
         ocrOutput.append(transcript);
+        const evidence = window.MedAlertOCR.renderFieldEvidence(fieldEvidence);
+        if (evidence) ocrOutput.append(evidence);
         const analysisPanel = window.MedAlertGemini.createAnalysisPanel(results);
         if (analysisPanel) ocrOutput.append(analysisPanel);
         ocrOutput.append(catalogOutput);
@@ -993,7 +1000,10 @@ window.MedAlertWeb = (() => {
     const noticeTitle = element('strong');
     const noticeText = element('p');
     notice.lastChild.append(noticeTitle, noticeText);
-    aside.append(progressCard, notice);
+    const pause = button('Volver a Recepción', 'button button-secondary', () => navigate('2:5027'));
+    const observe = button('Registrar observación', 'button button-secondary', () => navigate('41:166'));
+    aside.append(progressCard, notice, pause);
+    if (!isHeld(record)) aside.append(observe);
     layout.append(list, aside);
     main.append(layout);
     addLocalOnlyNotice(main, 'Checklist de revisión manual. Completarla no equivale a una consulta oficial ni a una aprobación sanitaria.');
@@ -1008,7 +1018,7 @@ window.MedAlertWeb = (() => {
       noticeTitle.textContent = completeList ? 'Lista completa' : 'Sin todas las comprobaciones';
       noticeText.textContent = completeList
         ? 'El bulto está listo para el contraste manual.'
-        : 'Completa todas las comprobaciones antes de continuar.';
+        : 'Puedes retomar la revisión desde Recepción. Si una comprobación falla, registra el motivo como observación.';
       const next = document.querySelector('#continue-checklist');
       if (next) next.disabled = !completeList;
     }
